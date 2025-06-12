@@ -1,0 +1,6 @@
+streamlit
+g4f
+aiohttp
+requests
+beautifulsoup4
+pycryptodome
