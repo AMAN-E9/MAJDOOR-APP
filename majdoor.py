@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-st.title("👨‍🌾 MAJDOOR: Tera AI Kisan Dost (Jo har baat pe beizzati karega)")
+st.title("👨‍🌾 MAJDOOR")
 
 # Session State Init
 if "chat_history" not in st.session_state:
