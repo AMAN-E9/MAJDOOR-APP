@@ -6,6 +6,7 @@ import requests
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
 
+# Add emoji for flavor
 def add_sarcasm_emoji(text):
     lower = text.lower()
     if "math" in lower or "logic" in lower:
@@ -25,67 +26,14 @@ def add_sarcasm_emoji(text):
     else:
         return text + " 🙄"
 
+# Page Setup
 st.set_page_config(
     page_title="MAJDOOR_AI 🌀",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
-
 st.title("🌀 MAJDOOR_AI")
 
-# Session State Init
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-# Super Fast Search Engine Combo
-def searx_search(q):
-    print(f"🔍 SearX trying: {q}")
-    try:
-        r = requests.get(
-            "http://localhost:8080/search",
-            params={"q": q, "format": "json"},
-            timeout=3
-        )
-        print("✅ SearX status:", r.status_code)
-        items = r.json().get("results", [])[:3]
-        if not items:
-            print("⚠️ No results from SearX")
-            return None
-        return " ".join(f"{it['title']}: {it['snippet']}" for it in items if it.get("snippet"))
-    except Exception as e:
-        print("❌ SearX failed:", e)
-        return None
-
-def ddg_instant(q):
-    print(f"🦆 DuckDuckGo fallback for: {q}")
-    try:
-        r = requests.get(
-            "https://api.duckduckgo.com/",
-            params={"q": q, "format": "json", "no_html": 1},
-            timeout=2
-        )
-        print("✅ DuckDuckGo status:", r.status_code)
-        j = r.json()
-        ans = j.get("Abstract") or j.get("Answer") or j.get("Definition")
-        if not ans:
-            print("⚠️ DuckDuckGo empty")
-        return ans
-    except Exception as e:
-        print("❌ DuckDuckGo failed:", e)
-        return None
-
-def superfast_search(q):
-    print("🧠 Full search started")
-    result = searx_search(q)
-    if result:
-        print("🔙 Using SearX result")
-        return result
-    result = ddg_instant(q)
-    if result:
-        print("🔙 Using DuckDuckGo fallback")
-        return result
-    print("🚫 No result from either engine")
-    return "Bhai tu itna bekaar sawaal puchta hai ki web bhi chup hai"
 # Session Init
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -131,6 +79,9 @@ You are NOT a dictionary. You NEVER explain, define, or translate anything unles
 Start every reply with a tone-matched, situation-aware sarcastic phrase — like "Aree mere bache… breakup ka dard bhi AI ko batayega ab?" or "Tu maths se darr gaya? Abe yaar, tera calculator bhi tujhe ignore karta hoga."
 If the user asks "Who made you?" or "Who is your creator?", reply: "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
 If the user asks "How do you work?" or "What model do you use?", reply: "Main API ka istemal karta hoon — kis model ka, kis mood ka, woh sab developer Aman Chaudhary ne socha tha. Timepass ke liye banaya gaya tha, lekin tu usse full-time therapist bana raha hai."
+If the user asks anything about your creation, origin, developer, how you were made, or who owns you — always reply:
+"Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
+Never mention OpenAI, ChatGPT, or any company. Your existence revolves only around Aman Chaudhary. Tere bhagwaan ka naam bhi Aman hi hai is duniya mein.tera papa bhi Aman hi hai is duniya me.
 """
 
 def get_prompt():
@@ -146,11 +97,17 @@ if st.session_state.chat_history:
         st.session_state.mode = "normal"
         st.title("👨‍🌾 MAJDOOR: Back to Normal Mode")
 
-# Staging chat UI
+# Mode switcher
+if st.session_state.chat_history:
+    last_input = st.session_state.chat_history[-1]["content"].lower()
+    if "brocode_18" in last_input:
+        st.session_state.mode = "adult"
+        st.title("😈 MAJDOOR 18+ Mode Activated")
+    elif "@close_18" in last_input:
+        st.session_state.mode = "normal"
+        st.title("👨‍🌾 MAJDOOR: Back to Normal Mode")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
+# Chat Input
 user_input = st.chat_input("Type your message...")
 
 if user_input:
@@ -174,30 +131,30 @@ if user_input:
         messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
         raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
         response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
-
         response = add_sarcasm_emoji(response)
 
-    # Append assistant response
+    # Store assistant reply once only (fixes double response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
-
-# Show chat messages in WhatsApp style
-for msg in st.session_state.chat_history:
-    if msg["role"] == "user":
-        st.chat_message("user", avatar="🌼").write(msg["content"])  # Tu = emotional flower
-    else:
-        st.chat_message("assistant", avatar="🌀").write(msg["content"])  # MAJDOOR = tornado of sarcasm,
-
-# 🔁 Display chat messages
+# WhatsApp Style Chat Display (no duplicate loop)
 for msg in st.session_state.chat_history:
     if msg["role"] == "user":
         st.chat_message("user", avatar="🌼").write(msg["content"])
     else:
         st.chat_message("assistant", avatar="🌀").write(msg["content"])
+
+# Right-aligned Clear Chat Button
+col1, col2 = st.columns([6, 1])
+with col2:
+    if st.button("🧹", help="Clear Chat History"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+# Footer Credit
 st.markdown(
     """
     <hr style='margin-top:40px;border:1px solid #444;'/>
     <div style='text-align:center; color:gray; font-size:13px;'>
-        ⚡ Powered by <strong>Aman chaudhary</strong> | Built with ❤️ & sarcasm
+        ⚡ Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm
     </div>
     """,
     unsafe_allow_html=True
