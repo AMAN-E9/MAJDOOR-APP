@@ -5,4 +5,5 @@ requests
 beautifulsoup4
 pycryptodome
 sympy
-pytesseract
+easyorc
+torch
