@@ -1,6 +1,10 @@
 import sys, os, streamlit as st, requests
 from sympy import symbols, Eq, solve
-from pix2text import Pix2Text
+from PIL import Image
+import pytesseract
+
+img = Image.open(img)
+eq_text = pytesseract.image_to_string(img)
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
