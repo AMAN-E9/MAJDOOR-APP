@@ -119,7 +119,7 @@ if user_input:
 # 👁️ Camera Toggle Button — full switch behavior
 col1, col2 = st.columns([1, 6])
 with col1:
-if "show_camera" not in st.session_state:
+  if "show_camera" not in st.session_state:
     st.session_state.show_camera = False
 
 toggle_clicked = st.button("👁️", help="Click to toggle camera", key="camera_toggle")
