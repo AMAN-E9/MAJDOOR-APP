@@ -2,10 +2,18 @@ import sys, os, streamlit as st, requests
 from sympy import symbols, Eq, solve
 from PIL import Image
 import pytesseract
+import io
 
-img = Image.open(img)
-eq_text = pytesseract.image_to_string(img)
+if img:
+    st.image(img, caption="Captured Photo", use_column_width=True)
+    try:
+        img_pil = Image.open(io.BytesIO(img.getvalue()))
+        eq_text = pytesseract.image_to_string(img_pil)
 
+        st.success(f"🧾 Samjha gaya: {eq_text.strip()}")
+        # Your sympy logic below here
+    except Exception as e:
+        st.error(f"❌ MAJDOOR confuse ho gaya: {str(e)}")
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
 
