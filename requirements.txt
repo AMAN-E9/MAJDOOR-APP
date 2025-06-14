@@ -4,5 +4,9 @@ aiohttp
 requests
 beautifulsoup4
 pycryptodome
-easyorc
+pix2text
 torch==1.13.1
+cnstd
+cnocr
+opencv-python-headless
+pillow
