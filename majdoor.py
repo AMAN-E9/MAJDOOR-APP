@@ -1,5 +1,35 @@
 import sys, os, streamlit as st, requests
 from sympy import symbols, Eq, solve
+import easyocr
+import io
+from PIL import Image
+
+st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
+
+img = st.camera_input("Aankh maar aur sawaal ki photo kheench le")
+
+if img is not None:
+    st.image(img, caption="Teri captured beizzati", use_container_width=True)
+    try:
+        img_bytes = img.getvalue()
+        img_pil = Image.open(io.BytesIO(img_bytes))
+
+        reader = easyocr.Reader(['en'])
+        result = reader.readtext(img_bytes)
+
+        text = ' '.join([d[1] for d in result])
+
+        st.success(f"🧾 MAJDOOR ne padha: {text}")
+
+        from sympy import symbols, Eq, solve
+        x = symbols('x')
+        parsed_eq = Eq(eval(text.replace("=", "==")))
+        sol = solve(parsed_eq)
+
+        st.markdown(f"MAJDOOR: Jawab nikala gaya: {sol} 🧠📸")
+
+    except Exception as e:
+        st.error(f"⚠️ Bhai, ya to tera sawaal NASA ka tha ya image me kuch likha hi nahi tha: {str(e)}")
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
