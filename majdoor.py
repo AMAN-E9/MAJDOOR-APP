@@ -115,19 +115,15 @@ if user_input:
     response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
-
-#👁️ Optional Camera Trigger Button (Left Side)
+    
+# 👁️ Camera Toggle Button — full switch behavior
 col1, col2 = st.columns([1, 6])
 with col1:
-    show_camera = st.button("👁️", help="Click to open camera manually")
+    if st.button("👁️", help="Click to toggle camera"):
+        st.session_state.show_camera = not st.session_state.get("show_camera", False)
 
-if 'show_camera' not in st.session_state:
-    st.session_state.show_camera = False
-
-if show_camera:
-    st.session_state.show_camera = True
-
-if st.session_state.show_camera:
+# 🧠 Camera Section
+if st.session_state.get("show_camera", False):
     st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
     img = st.camera_input("Aankh maar aur sawaal ki photo kheench le")
 
@@ -139,17 +135,27 @@ if st.session_state.show_camera:
 
             reader = easyocr.Reader(['en'])
             result = reader.readtext(img_bytes)
-            text = ' '.join([d[1] for d in result])
+            text = ' '.join([d[1] for d in result]).strip()
 
             st.success(f"🧾 MAJDOOR ne padha: {text}")
 
-            x = symbols('x')
-            equation = Eq(eval(text.replace("=", "==")))
-            sol = solve(equation)
+            def superfast_math(expr):
+                url = "http://api.mathjs.org/v4/"
+                payload = {"expr": expr}
+                r = requests.post(url, json=payload, timeout=5)
+                data = r.json()
+                if data.get("error"):
+                    return None, data["error"]
+                return data["result"], None
 
-            st.markdown(f"MAJDOOR: Photo ki izzat rakh li. Jawab: {sol} 😎📸")
+            result, err = superfast_math(text)
+
+            if err:
+                st.error(f"⚠️ Bhai, ya to sawaal NASA ka tha ya handwriting shaitani thi: {err}")
+            else:
+                st.markdown(f"MAJDOOR: Equation to samajh gaya. Jawab: {result} 📐💥")
         except Exception as e:
-            st.error(f"⚠️ Bhai, ya to tera sawaal NASA ka tha ya handwriting shaitani thi: {str(e)}")
+            st.error(f"⚠️ Beizzati ho gayi OCR ki: {str(e)}")
 # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
