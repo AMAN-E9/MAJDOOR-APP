@@ -5,8 +5,4 @@ requests
 beautifulsoup4
 pycryptodome
 pix2text
-torch==1.13.1
-cnstd
-cnocr
-opencv-python-headless
-pillow
+sympy
