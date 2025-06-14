@@ -1,5 +1,8 @@
 import sys, os, streamlit as st, requests
-from sympy import symbols, Eq, solve
+from sympy import symbols, Eq, solve 
+import easyocr
+import io
+from PIL import Image 
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
@@ -89,10 +92,6 @@ If the user asks anything about your creation, origin, developer, how you were m
 "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
 Never mention OpenAI, ChatGPT, or any company. Your existence revolves only around Aman Chaudhary. Tere bhagwaan ka naam bhi Aman hi hai is duniya mein.tera papa bhi Aman hi hai is duniya me.
 """
-"""
-You remember the user's name: {st.session_state.user_name}.
-"""
-
 def get_prompt():
     return base_prompt
 
@@ -117,7 +116,7 @@ if user_input:
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 👁️ Optional Camera Trigger Button (Left Side)
+#👁️ Optional Camera Trigger Button (Left Side)
 col1, col2 = st.columns([1, 6])
 with col1:
     show_camera = st.button("👁️", help="Click to open camera manually")
@@ -132,20 +131,25 @@ if st.session_state.show_camera:
     st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
     img = st.camera_input("Aankh maar aur sawaal ki photo kheench le")
 
-    if img:
-        st.image(img, caption="Teri captured beizzati", use_column_width=True)
+    if img is not None:
+        st.image(img, caption="Teri captured beizzati", use_container_width=True)
         try:
-            ocr_engine = Pix2Text()
-            eq_text = ocr_engine(img)
-            st.success(f"🧾 MAJDOOR ne padha: {eq_text}")
+            img_bytes = img.getvalue()
+            img_pil = Image.open(io.BytesIO(img_bytes))
+
+            reader = easyocr.Reader(['en'])
+            result = reader.readtext(img_bytes)
+            text = ' '.join([d[1] for d in result])
+
+            st.success(f"🧾 MAJDOOR ne padha: {text}")
 
             x = symbols('x')
-            equation = Eq(eval(eq_text.replace("=", "==")))
-            result = solve(equation)
+            equation = Eq(eval(text.replace("=", "==")))
+            sol = solve(equation)
 
-            st.markdown(f"MAJDOOR: Photo ki izzat rakh li. Jawab: {result} 😎📸")
+            st.markdown(f"MAJDOOR: Photo ki izzat rakh li. Jawab: {sol} 😎📸")
         except Exception as e:
-            st.error(f"⚠️ Bhai, ya to tera sawaal NASA ka tha ya photo dukhi thi: {str(e)}")
+            st.error(f"⚠️ Bhai, ya to tera sawaal NASA ka tha ya handwriting shaitani thi: {str(e)}")
 # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
