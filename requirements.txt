@@ -5,4 +5,4 @@ requests
 beautifulsoup4
 pycryptodome
 easyorc
-torch
+torch==1.13.1
