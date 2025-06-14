@@ -119,9 +119,13 @@ if user_input:
 # 👁️ Camera Toggle Button — full switch behavior
 col1, col2 = st.columns([1, 6])
 with col1:
-    if st.button("👁️", help="Click to toggle camera"):
-        st.session_state.show_camera = not st.session_state.get("show_camera", False)
+if "show_camera" not in st.session_state:
+    st.session_state.show_camera = False
 
+toggle_clicked = st.button("👁️", help="Click to toggle camera", key="camera_toggle")
+
+if toggle_clicked:
+    st.session_state.show_camera = not st.session_state.show_camera
 # 🧠 Camera Section
 if st.session_state.get("show_camera", False):
     st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
