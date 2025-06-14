@@ -4,14 +4,17 @@ from PIL import Image
 import pytesseract
 import io
 
-if img:
+st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
+img = st.camera_input("Camera khol aur question capture kar")
+
+if img is not None:
     st.image(img, caption="Captured Photo", use_column_width=True)
     try:
         img_pil = Image.open(io.BytesIO(img.getvalue()))
         eq_text = pytesseract.image_to_string(img_pil)
 
         st.success(f"🧾 Samjha gaya: {eq_text.strip()}")
-        # Your sympy logic below here
+        # Your sympy solve logic can go here
     except Exception as e:
         st.error(f"❌ MAJDOOR confuse ho gaya: {str(e)}")
 sys.path.append(os.path.abspath("../gpt4free"))
