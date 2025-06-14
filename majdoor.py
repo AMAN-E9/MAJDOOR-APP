@@ -1,3 +1,21 @@
+import easyocr
+
+reader = easyocr.Reader(['en'])
+result = reader.readtext(img_pil)
+text = ' '.join([d[1] for d in result])
+st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
+img = st.camera_input("Camera khol aur question capture kar")
+
+if img is not None:
+    st.image(img, caption="Captured Photo", use_column_width=True)
+    try:
+        img_pil = Image.open(io.BytesIO(img.getvalue()))
+        eq_text = pytesseract.image_to_string(img_pil)
+
+        st.success(f"🧾 Samjha gaya: {eq_text.strip()}")
+        # Your sympy solve logic can go here
+    except Exception as e:
+        st.error(f"❌ MAJDOOR confuse ho gaya: {str(e)}")
 import sys, os, streamlit as st, requests
 from sympy import symbols, Eq, solve
 from PIL import Image
