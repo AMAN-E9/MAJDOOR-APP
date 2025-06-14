@@ -4,6 +4,3 @@ aiohttp
 requests
 beautifulsoup4
 pycryptodome
-sympy
-easyorc
-torch
