@@ -117,24 +117,35 @@ if user_input:
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 📸 Camera OCR Block – Solve math from photo
-st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
-img = st.camera_input("Aankh maar aur sawaal ki photo kheench le")
+# 👁️ Optional Camera Trigger Button (Left Side)
+col1, col2 = st.columns([1, 6])
+with col1:
+    show_camera = st.button("👁️", help="Click to open camera manually")
 
-if img:
-    st.image(img, caption="Teri captured beizzati", use_column_width=True)
-    try:
-        ocr_engine = Pix2Text()
-        eq_text = ocr_engine(img)
-        st.success(f"🧾 MAJDOOR ne padha: {eq_text}")
+if 'show_camera' not in st.session_state:
+    st.session_state.show_camera = False
 
-        x = symbols('x')
-        equation = Eq(eval(eq_text.replace("=", "==")))
-        result = solve(equation)
+if show_camera:
+    st.session_state.show_camera = True
 
-        st.markdown(f"MAJDOOR: Photo ki izzat rakh li. Jawab: {result} 😎📸")
-    except Exception as e:
-        st.error(f"⚠️ Bhai, ya to tera sawaal NASA ka tha ya photo dukhi thi: {str(e)}")
+if st.session_state.show_camera:
+    st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
+    img = st.camera_input("Aankh maar aur sawaal ki photo kheench le")
+
+    if img:
+        st.image(img, caption="Teri captured beizzati", use_column_width=True)
+        try:
+            ocr_engine = Pix2Text()
+            eq_text = ocr_engine(img)
+            st.success(f"🧾 MAJDOOR ne padha: {eq_text}")
+
+            x = symbols('x')
+            equation = Eq(eval(eq_text.replace("=", "==")))
+            result = solve(equation)
+
+            st.markdown(f"MAJDOOR: Photo ki izzat rakh li. Jawab: {result} 😎📸")
+        except Exception as e:
+            st.error(f"⚠️ Bhai, ya to tera sawaal NASA ka tha ya photo dukhi thi: {str(e)}")
 # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
