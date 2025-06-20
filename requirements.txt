@@ -5,3 +5,4 @@ requests
 pillow
 lxml
 sympy
+easyocr
