@@ -7,3 +7,5 @@ pycryptodome
 easyocr
 sympy
 pillow
+apktool_wrapper
+lxml
