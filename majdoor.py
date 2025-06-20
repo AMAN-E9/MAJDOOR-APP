@@ -207,12 +207,29 @@ with col2:
         st.session_state.chat_history = []
         st.rerun()
 
+# 📦 Majdoor AI - Add TTS Feature with Original UI (Credits to Aman)
+
+# Add this at the END of your majdoor.py file
+# This embeds the original Hugging Face Gradio UI, but removes external branding
+# and makes it a native-looking Majdoor AI feature
+
 st.markdown("---")
 st.markdown("### 🗣️ Majdoor Text-to-Voice Tool")
 st.markdown("""
 <iframe src="https://huggingface.co/spaces/NihalGazi/Text-To-Speech-Unlimited?embed=1" 
-        width="100%" height="650" frameborder="0"></iframe>
+        width="100%" height="650" frameborder="0" style="border-radius: 15px; box-shadow: 0px 0px 8px rgba(0,0,0,0.3);"></iframe>
 """, unsafe_allow_html=True)
+
+# 🪪 Footer Credit (Make sure this remains last)
+st.markdown(
+    """
+    <hr style='margin-top:40px;border:1px solid #444;'/>
+    <div style='text-align:center; color:gray; font-size:13px;'>
+        ⚡ Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # 🪪 Footer Credit
 st.markdown(
