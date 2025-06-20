@@ -207,6 +207,14 @@ with col2:
         st.session_state.chat_history = []
         st.rerun()
 
+# 🔊 Voice Tool Footer Panel
+st.markdown("---")
+st.markdown("### 🗣️ Majdoor Text-to-Voice Tool")
+st.markdown("""
+<iframe src="https://aman-e9.github.io/MAJDOOR-APP/tts_ui/" width="100%" height="500"></iframe>
+""", unsafe_allow_html=True)
+st.caption("🎙 Voice generated using Majdoor's sarcasm processor")
+
 # 🪪 Footer Credit
 st.markdown(
     """
