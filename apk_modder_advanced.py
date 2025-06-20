@@ -1,88 +1,64 @@
-
 import os
+import re
 import shutil
 import subprocess
 
-APKTOOL_PATH = "apktool"  # Ensure this is in your system path
-SIGNED_APK = "signed_output.apk"
-TRACKER_LOG = "detected_trackers.txt"
+APKTOOL_PATH = "tools/apktool.2.11.1.jar"  # Adjust if needed
 
-def mod_apk(apk_path):
-    app_name = "decompiled_app"
-    cleaned_apk = "recompiled.apk"
+def mod_apk(input_apk):
+    if not os.path.exists("tools"):
+        os.makedirs("tools")
 
     # Step 1: Decompile APK
-    if os.path.exists(app_name):
-        shutil.rmtree(app_name)
-    subprocess.run([APKTOOL_PATH, "d", apk_path, "-o", app_name, "-f"], check=True)
+    subprocess.run(["java", "-jar", APKTOOL_PATH, "d", input_apk, "-o", "decompiled", "-f"], check=True)
 
-    # Step 2: Clean the Manifest (remove bad permissions)
-    manifest_path = os.path.join(app_name, "AndroidManifest.xml")
-    if os.path.exists(manifest_path):
-        with open(manifest_path, "r") as f:
-            content = f.read()
-        bad_permissions = [
-            "RECORD_AUDIO", "READ_CONTACTS", "WRITE_CONTACTS", "ACCESS_FINE_LOCATION",
-            "ACCESS_COARSE_LOCATION", "READ_SMS", "SEND_SMS", "RECEIVE_SMS"
-        ]
-        for perm in bad_permissions:
-            content = content.replace(f'android.permission.{perm}', "REMOVED_BY_MAJDOOR")
-        with open(manifest_path, "w") as f:
-            f.write(content)
+    smali_path = "decompiled/smali"
+    logs = []
 
-    # Step 3: Scan and remove ad SDK & tracker references
-    ad_keywords = ["admob", "facebook.ads", "chartboost", "unityads", "startapp"]
-    tracker_keywords = ["track", "analytics", "crashlytics", "adjust", "flurry", "firebase", "segment"]
-    found_trackers = []
+    # Step 2: Scan for Ads & Malware Strings
+    ad_keywords = ["admob", "ads", "com.google.android.gms.ads", "facebook.ads", "unityads"]
+    malware_keywords = ["coinhive", "payload", "auto_downloader", "bootreceiver"]
 
-    for root, _, files in os.walk(app_name):
+    for root, dirs, files in os.walk(smali_path):
         for file in files:
             if file.endswith(".smali"):
-                path = os.path.join(root, file)
-                with open(path, "r") as f:
-                    lines = f.readlines()
-                new_lines = []
-                for line in lines:
-                    if any(ad in line.lower() for ad in ad_keywords):
-                        continue  # Remove ads
-                    if any(tk in line.lower() for tk in tracker_keywords):
-                        found_trackers.append(line.strip())
-                    new_lines.append(line)
-                with open(path, "w") as f:
-                    f.writelines(new_lines)
+                full_path = os.path.join(root, file)
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                original_content = content
 
-    # Write found trackers to file
-    with open(TRACKER_LOG, "w") as f:
-        if found_trackers:
-            f.write("Detected tracker-related code:\n")
-            for tracker in found_trackers:
-                f.write(tracker + "\n")
-        else:
-            f.write("No trackers found.")
+                for kw in ad_keywords + malware_keywords:
+                    content = re.sub(rf'.*{re.escape(kw)}.*\n?', '', content)
 
-    # Step 4: Inject branding into app_name in strings.xml
-    strings_xml_path = os.path.join(app_name, "res", "values", "strings.xml")
-    if os.path.exists(strings_xml_path):
-        with open(strings_xml_path, "r", encoding="utf-8") as f:
-            strings_content = f.read()
-        strings_content = strings_content.replace("<string name=\"app_name\">", "<string name=\"app_name\">Majdoor_")
-        with open(strings_xml_path, "w", encoding="utf-8") as f:
-            f.write(strings_content)
+                if content != original_content:
+                    logs.append(f"[CLEANED] {full_path}")
+                    with open(full_path, "w", encoding="utf-8") as f:
+                        f.write(content)
 
-    # Step 5: Rebuild APK
-    subprocess.run([APKTOOL_PATH, "b", app_name, "-o", cleaned_apk], check=True)
+    # Step 3: Clean AndroidManifest.xml
+    manifest = "decompiled/AndroidManifest.xml"
+    if os.path.exists(manifest):
+        with open(manifest, "r", encoding="utf-8") as f:
+            manifest_data = f.read()
+        original_manifest = manifest_data
 
-    # Step 6: Sign APK
-    try:
-        subprocess.run([
-            "apksigner", "sign",
-            "--ks", "debug.keystore",
-            "--ks-pass", "pass:android",
-            "--key-pass", "pass:android",
-            "--out", SIGNED_APK,
-            cleaned_apk
-        ], check=True)
-        return SIGNED_APK
-    except Exception as e:
-        print("Signing failed. Returning unsigned APK.")
-        return cleaned_apk
+        dangerous_permissions = [
+            "RECEIVE_SMS", "READ_SMS", "SEND_SMS", "READ_CALL_LOG",
+            "RECEIVE_BOOT_COMPLETED", "SYSTEM_ALERT_WINDOW"
+        ]
+        for perm in dangerous_permissions:
+            manifest_data = re.sub(rf'<uses-permission[^>]*{perm}[^>]*>', '', manifest_data)
+
+        if manifest_data != original_manifest:
+            logs.append("[CLEANED] Dangerous permissions removed from Manifest")
+            with open(manifest, "w", encoding="utf-8") as f:
+                f.write(manifest_data)
+
+    # Step 4: Recompile APK
+    subprocess.run(["java", "-jar", APKTOOL_PATH, "b", "decompiled", "-o", "cleaned_output.apk"], check=True)
+
+    # Step 5: Save logs
+    with open("detected_trackers.txt", "w") as log_file:
+        log_file.write("\n".join(logs) if logs else "✅ No trackers/ads found.")
+
+    return "cleaned_output.apk"
