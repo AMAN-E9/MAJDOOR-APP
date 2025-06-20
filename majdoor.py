@@ -207,18 +207,25 @@ with col2:
         st.session_state.chat_history = []
         st.rerun()
 
-# 📦 Majdoor AI - Add TTS Feature with Original UI (Credits to Aman)
-
-# Add this at the END of your majdoor.py file
-# This embeds the original Hugging Face Gradio UI, but removes external branding
-# and makes it a native-looking Majdoor AI feature
+# ──────────────────────────────────────────────────────────────
+# 👄 Lips Icon Toggle for Voice Tool Section
 
 st.markdown("---")
-st.markdown("### 🗣️ Majdoor Text-to-Voice Tool")
-st.markdown("""
-<iframe src="https://huggingface.co/spaces/NihalGazi/Text-To-Speech-Unlimited?embed=1" 
-        width="100%" height="650" frameborder="0" style="border-radius: 15px; box-shadow: 0px 0px 8px rgba(0,0,0,0.3);"></iframe>
-""", unsafe_allow_html=True)
+col_lip, col_spacer = st.columns([1, 10])
+with col_lip:
+    if "show_voice_ui" not in st.session_state:
+        st.session_state.show_voice_ui = False
+
+    if st.button("👄", help="Click to open Text-to-Voice Tool"):
+        st.session_state.show_voice_ui = not st.session_state.show_voice_ui
+
+if st.session_state.show_voice_ui:
+    st.markdown("### 🗣️ Majdoor Text-to-Voice Tool")
+    st.markdown("""
+    <iframe src="https://huggingface.co/spaces/NihalGazi/Text-To-Speech-Unlimited?embed=1" 
+            width="100%" height="650" frameborder="0" style="border-radius: 15px; box-shadow: 0px 0px 8px rgba(0,0,0,0.3);"></iframe>
+    """, unsafe_allow_html=True)
+
 
 # 🪪 Footer Credit (Make sure this remains last)
 st.markdown(
