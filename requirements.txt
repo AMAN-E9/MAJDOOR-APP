@@ -6,3 +6,8 @@ pillow
 lxml
 sympy
 easyocr
+apkutils-patch
+androguard
+pyyaml
+bs4
+shutilwhich
