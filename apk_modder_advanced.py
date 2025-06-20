@@ -1,64 +1,86 @@
 import os
-import re
-import shutil
 import subprocess
 
-APKTOOL_PATH = "tools/apktool.2.11.1.jar"  # Adjust if needed
+APKTOOL_PATH = "tools/apktool.jar"
 
-def mod_apk(input_apk):
-    if not os.path.exists("tools"):
-        os.makedirs("tools")
+def mod_apk(apk_path):
+    decompiled = "decompiled_apk"
+    cleaned_apk = "cleaned_app.apk"
 
-    # Step 1: Decompile APK
-    subprocess.run(["java", "-jar", APKTOOL_PATH, "d", input_apk, "-o", "decompiled", "-f"], check=True)
+    # 1. Decompile APK
+    subprocess.run(["java", "-jar", APKTOOL_PATH, "d", apk_path, "-o", decompiled, "-f"])
 
-    smali_path = "decompiled/smali"
-    logs = []
-
-    # Step 2: Scan for Ads & Malware Strings
-    ad_keywords = ["admob", "ads", "com.google.android.gms.ads", "facebook.ads", "unityads"]
-    malware_keywords = ["coinhive", "payload", "auto_downloader", "bootreceiver"]
-
-    for root, dirs, files in os.walk(smali_path):
+    # 2. Remove common ad SDKs (like AdMob, UnityAds, etc.)
+    ad_keywords = ["com.google.android.gms.ads", "com.unity3d.ads", "facebook.ads", "adcolony", "applovin"]
+    smali_dir = os.path.join(decompiled, "smali")
+    for root, dirs, files in os.walk(smali_dir):
         for file in files:
             if file.endswith(".smali"):
-                full_path = os.path.join(root, file)
-                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                fpath = os.path.join(root, file)
+                with open(fpath, "r+", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                original_content = content
+                    for keyword in ad_keywords:
+                        if keyword in content:
+                            content = content.replace(keyword, "// removed ad sdk")
+                    f.seek(0)
+                    f.write(content)
+                    f.truncate()
 
-                for kw in ad_keywords + malware_keywords:
-                    content = re.sub(rf'.*{re.escape(kw)}.*\n?', '', content)
+    # 3. Remove webview-based redirects to ad sites
+    for root, dirs, files in os.walk(smali_dir):
+        for file in files:
+            if file.endswith(".smali"):
+                fpath = os.path.join(root, file)
+                with open(fpath, "r+", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                    if "loadUrl(\"http" in content:
+                        content = content.replace("loadUrl", "// removed webview ad")
+                    f.seek(0)
+                    f.write(content)
+                    f.truncate()
 
-                if content != original_content:
-                    logs.append(f"[CLEANED] {full_path}")
-                    with open(full_path, "w", encoding="utf-8") as f:
-                        f.write(content)
+    # 4. Remove watch-to-unlock logic (patch ad check to always true)
+    for root, dirs, files in os.walk(smali_dir):
+        for file in files:
+            if file.endswith(".smali"):
+                fpath = os.path.join(root, file)
+                with open(fpath, "r+", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                    if "if-eqz" in content or "if-nez" in content:
+                        content = content.replace("if-eqz", "const/4 v0, 0x1  # always true")
+                    f.seek(0)
+                    f.write(content)
+                    f.truncate()
 
-    # Step 3: Clean AndroidManifest.xml
-    manifest = "decompiled/AndroidManifest.xml"
+    # 5. Remove trackers and malicious domains (if strings.xml has known URLs)
+    trackers = ["firebase", "onesignal", "adjust", "google-analytics", "doubleclick"]
+    strings_path = os.path.join(decompiled, "res", "values", "strings.xml")
+    if os.path.exists(strings_path):
+        with open(strings_path, "r+", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+            for t in trackers:
+                if t in content:
+                    content = content.replace(t, "blocked-tracker")
+            f.seek(0)
+            f.write(content)
+            f.truncate()
+
+    # 6. Remove unwanted permissions
+    manifest = os.path.join(decompiled, "AndroidManifest.xml")
     if os.path.exists(manifest):
-        with open(manifest, "r", encoding="utf-8") as f:
-            manifest_data = f.read()
-        original_manifest = manifest_data
+        with open(manifest, "r+", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+            danger_perms = ["READ_SMS", "RECEIVE_SMS", "READ_CONTACTS", "ACCESS_FINE_LOCATION"]
+            for p in danger_perms:
+                content = content.replace(f'android.permission.{p}', "REMOVED")
+            f.seek(0)
+            f.write(content)
+            f.truncate()
 
-        dangerous_permissions = [
-            "RECEIVE_SMS", "READ_SMS", "SEND_SMS", "READ_CALL_LOG",
-            "RECEIVE_BOOT_COMPLETED", "SYSTEM_ALERT_WINDOW"
-        ]
-        for perm in dangerous_permissions:
-            manifest_data = re.sub(rf'<uses-permission[^>]*{perm}[^>]*>', '', manifest_data)
+    # 7. Rebuild APK
+    subprocess.run(["java", "-jar", APKTOOL_PATH, "b", decompiled, "-o", cleaned_apk])
 
-        if manifest_data != original_manifest:
-            logs.append("[CLEANED] Dangerous permissions removed from Manifest")
-            with open(manifest, "w", encoding="utf-8") as f:
-                f.write(manifest_data)
+    # 8. Sign APK (optional for installation)
+    # subprocess.run(["java", "-jar", "tools/apksigner.jar", "--ks", "debug.keystore", "--out", "signed.apk", cleaned_apk])
 
-    # Step 4: Recompile APK
-    subprocess.run(["java", "-jar", APKTOOL_PATH, "b", "decompiled", "-o", "cleaned_output.apk"], check=True)
-
-    # Step 5: Save logs
-    with open("detected_trackers.txt", "w") as log_file:
-        log_file.write("\n".join(logs) if logs else "✅ No trackers/ads found.")
-
-    return "cleaned_output.apk"
+    return cleaned_apk
