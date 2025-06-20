@@ -40,6 +40,7 @@ if st.session_state.user_name is None:
     st.stop()
 # 📂 APK Cleaner Feature Starts Here
 from apk_modder_advanced import mod_apk
+import os
 
 st.markdown("---")
 st.markdown("### 🔧 APK Cleaner - Majdoor AI")
@@ -47,23 +48,30 @@ st.markdown("### 🔧 APK Cleaner - Majdoor AI")
 apk_file = st.file_uploader("📂 Upload a Modded APK", type=["apk"])
 
 if apk_file:
-    st.success("APK received. Starting cleaning process...")
-    with open("input.apk", "wb") as f:
+    st.success("📦 APK received. Starting deep cleaning... 🔍")
+
+    input_path = "input.apk"
+    with open(input_path, "wb") as f:
         f.write(apk_file.read())
 
     try:
-        cleaned_apk = mod_apk("input.apk")
+        cleaned_apk = mod_apk(input_path)
         st.success("✅ APK cleaned successfully!")
 
-        with open("detected_trackers.txt", "r") as log:
-            logs = log.read()
-        st.text_area("🛡️ Removed Trackers:", logs, height=200)
+        # 🛡️ Show trackers/logs if they exist
+        if os.path.exists("detected_trackers.txt"):
+            with open("detected_trackers.txt", "r") as log:
+                logs = log.read()
+            st.text_area("🛡️ Removed Trackers & Dangerous Permissions:", logs, height=200)
+        else:
+            st.info("No known trackers or malware found.")
 
+        # 📥 Final download
         with open(cleaned_apk, "rb") as f:
-            st.download_button("⬇️ Download Clean APK", f, file_name="Majdoor_Cleaned.apk")
+            st.download_button("⬇️ Download Cleaned APK", f, file_name="Majdoor_Cleaned.apk")
 
     except Exception as e:
-        st.error(f"❌ Error cleaning APK: {e}")
+        st.error(f"❌ Cleaning failed: {e}")
 # 📂 APK Cleaner Feature Ends Here
 # PROMPT GOES HERE
 base_prompt = f"""You are MAJDOOR, Always respond with deadpan sarcasm in whatever language the user use. No polite tone. 
