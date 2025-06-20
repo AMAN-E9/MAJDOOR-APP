@@ -2,10 +2,5 @@ streamlit
 g4f
 aiohttp
 requests
-beautifulsoup4
-pycryptodome
-easyocr
-sympy
 pillow
-apktool_wrapper
 lxml
