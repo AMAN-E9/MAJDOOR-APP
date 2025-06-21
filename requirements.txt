@@ -4,10 +4,10 @@ aiohttp
 requests
 pillow
 lxml
-sympy
-easyocr
 apkutils-patch
 androguard
 pyyaml
 bs4
 shutilwhich
+wolframalpha
+docext @ git+https://github.com/NanoNets/docext
