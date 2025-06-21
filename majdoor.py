@@ -204,11 +204,10 @@ with col2:
     if st.button("🧹", help="Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
-
 # 🪪 Footer Credit
 st.markdown(
     """
-    <hr style='margin-top:40px;border:1px solid #444;'/>
+ <hr style='margin-top:40px;border:1px solid #444;'/>
     <div style='text-align:center; color:gray; font-size:13px;'>
         "⚡ Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm"
     </div>
