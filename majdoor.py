@@ -1,8 +1,8 @@
-import sys, os, streamlit as st, requests
-from sympy import symbols, Eq, solve 
-import easyocr
+import sys, os, streamlit as st, requests 
 import io
-from PIL import Image 
+from PIL import Image
+import wolframalpha  # pip install wolframalpha
+from docext.extract import get_text_from_image
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
@@ -150,6 +150,33 @@ if user_input:
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
     
+# 🔑 WolframAlpha API Key Setup
+WOLFRAM_APPID = "TL2RRR-H227VPEX28"
+client = wolframalpha.Client(WOLFRAM_APPID)
+
+# 🧠 Wolfram Answer Function
+def answer_wolfram(question):
+    try:
+        res = client.query(question)
+        for pod in res.results:
+            return pod.text  # ✔️ Correct indent
+        return "❌ Kuch result nahi mila Wolfram se."
+    except StopIteration:
+        return "❌ Wolfram confuse ho gaya, kuch nahi mila."
+    except Exception as e:
+        return f"❌ Wolfram error: {e}"
+
+# 🧠 Content Classifier: Math / Science / Document
+def classify_ocr_content(text):
+    t = text.lower()
+    if any(op in text for op in ["+", "-", "*", "/", "=", "^", "√"]) and len(text) < 100:
+        return "math"
+    elif any(word in t for word in ["velocity", "mole", "reaction", "displacement", "gravity", "current", "joule", "newton", "molarity"]):
+        return "science_problem"
+    elif any(word in t for word in ["aadhar", "pan", "invoice", "certificate", "passport", "dob", "gender", "govt", "address"]):
+        return "document"
+    else:
+        return "unknown"
 # 👁️ Camera Toggle Button — full switch behavior
 col1, col2 = st.columns([1, 6])
 with col1:
@@ -160,40 +187,64 @@ toggle_clicked = st.button("👁️", help="Click to toggle camera", key="camera
 
 if toggle_clicked:
     st.session_state.show_camera = not st.session_state.show_camera
-# 🧠 Camera Section
+# 🧠 Camera OCR Section + Smart Handling
+
 if st.session_state.get("show_camera", False):
-    st.markdown("## 📷 Photo se Ganit Ka Bhoot Nikaalein")
-    img = st.camera_input("Aankh maar aur sawaal ki photo kheench le")
+    st.markdown("## 📷 Photo se OCR aur MAJDOOR ki Bhasha")
+
+    img = st.camera_input("📸 Kheench le photo jisme dard chhupa ho")
 
     if img is not None:
-        st.image(img, caption="Teri captured beizzati", use_container_width=True)
+        st.image(img, caption="📸 Teri captured image", use_container_width=True)
+
         try:
+            # 🖼️ Save image
             img_bytes = img.getvalue()
             img_pil = Image.open(io.BytesIO(img_bytes))
+            img_pil.save("camera_input.png")
 
-            reader = easyocr.Reader(['en'])
-            result = reader.readtext(img_bytes)
-            text = ' '.join([d[1] for d in result]).strip()
+            # 🧾 OCR using docext
+            extracted = get_text_from_image("camera_input.png")
+            text = extracted.get("text", "").strip()
 
-            st.success(f"🧾 MAJDOOR ne padha: {text}")
-
-            def superfast_math(expr):
-                url = "http://api.mathjs.org/v4/"
-                payload = {"expr": expr}
-                r = requests.post(url, json=payload, timeout=5)
-                data = r.json()
-                if data.get("error"):
-                    return None, data["error"]
-                return data["result"], None
-
-            result, err = superfast_math(text)
-
-            if err:
-                st.error(f"⚠️ Bhai, ya to sawaal NASA ka tha ya handwriting shaitani thi: {err}")
+            if not text:
+                st.warning("📄 Image me kuch likha hi nahi mila bhai.")
             else:
-                st.markdown(f"MAJDOOR: Equation to samajh gaya. Jawab: {result} 📐💥")
+                st.success(f"🧾 MAJDOOR ne padha: `{text}`")
+                ctype = classify_ocr_content(text)
+
+                if ctype == "math":
+                    st.info("📐 Math mila... Wolfram ko kaam pe lagaya")
+                    answer = answer_wolfram(text)
+                    st.success(f"📊 Jawab: `{answer}`")
+
+                elif ctype == "science_problem":
+                    st.info("🔬 Science ka jhanjhat... Wolfram se dard bhara jawab le")
+                    answer = answer_wolfram(text)
+                    st.success(f"📚 MAJDOOR ka dimaag: `{answer}`")
+
+                elif ctype == "document":
+                    st.info("📄 Lagta hai koi document hai... samjha jaa raha hai")
+
+                    st.session_state.chat_history.append({"role": "user", "content": f"Yeh document hai:\n\n{text}\n\nYeh kis type ka document ho sakta hai aur isme kya likha hai?"})
+                    messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
+                    raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
+                    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                    st.markdown(f"📃 MAJDOOR ne samjhaya:\n\n{response}")
+
+                else:
+                    st.info("😐 Kuch samajh nahi aaya... normal sarcasm response de raha hoon")
+                    st.session_state.chat_history.append({"role": "user", "content": text})
+                    messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
+                    raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
+                    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Kuch khaas nahi mila.")
+                    st.session_state.chat_history.append({"role": "assistant", "content": response})
+                    st.markdown(f"🤖 MAJDOOR: {response}")
+
         except Exception as e:
-            st.error(f"⚠️ Beizzati ho gayi OCR ki: {str(e)}")
+            st.error(f"❌ OCR ya answer fetch karte waqt error: {e}")
+
 # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
