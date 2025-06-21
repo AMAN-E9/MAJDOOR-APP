@@ -136,28 +136,40 @@ if st.session_state.chat_history:
         st.session_state.mode = "normal"
         st.title("👨‍🌾 MAJDOOR: Back to Normal Mode")
 
-# Chat Input
+  # 🧠 Chat Input
 user_input = st.chat_input("Type your message...")
 
 if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
-
     raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "")
-
-    # 🔍 Smart check if response is bakwaas
-    vague_lines = ["sorry", "kuch khaas nahi", "i don't know", "not sure", "unable to answer"]
-    is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 5
+    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+    
+    # 🧠 Sarcastic fallback checker
+    vague_lines = [
+        "sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea",
+        "do i look like", "ask google", "telepathically", "search it", "literally type"
+    ]
+    is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
 
     if is_vague:
         google_ans = ask_google(user_input)
-        response = f"🤷 GPT kuch bol nahi paya, toh MAJDOOR ne Google ki chappal uthayi:\n\n🔎 {google_ans}"
-    else:
-        response = add_sarcasm_emoji(response)
+        response = f"📡 GPT toh sarcasm me uljha tha, MAJDOOR ne Google se jawab nikaal diya:\n\n👉 **{google_ans}** 😏"
 
+    response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
+# 🔍 Extra Trigger: Manual Google Search via Majdoor
+with st.form(key="search_form", clear_on_submit=True):
+    manual_search = st.text_input("🔍 GPT bakwaas kare? Seedha MAJDOOR Google se laayega:", placeholder="Type here...")
+    search_button = st.form_submit_button("📡 Search Google")
+
+if search_button and manual_search.strip():
+    google_result = ask_google(manual_search)
+    response = f"📡 GPT toh thak gaya tha, MAJDOOR Google se laaya:\n\n👉 **{google_result}** 😤"
+    response = add_sarcasm_emoji(response)
+    st.session_state.chat_history.append({"role": "user", "content": manual_search})
+    st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
