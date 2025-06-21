@@ -136,24 +136,33 @@ elif user_input:
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 💬 Chat History Show + 🔞 Emoji Actions
+from urllib.parse import quote
+
 for i, msg in enumerate(st.session_state.chat_history):
     icon = "🌼" if msg["role"] == "user" else "🌀"
     st.chat_message(msg["role"], avatar=icon).write(msg["content"])
 
+    # 🔞 Gallery icon for assistant responses
     if msg["role"] == "assistant":
-        with st.expander("🔞 See Spicy Visuals"):
-            password = st.text_input(f"Enter password to unlock NSFW/Pinterest 🔓", type="password", key=f"pwd_{i}")
+        with st.expander("🖼️ Unlock Visual Gallery"):
+            password = st.text_input("Enter password to view 🔞 gallery", type="password", key=f"pwd_{i}")
             if password == "kissmiss":
-                query = st.session_state.chat_history[-1]["content"]
-                st.markdown(f"### 📌 Pinterest Images for: `{query}`")
-                st.markdown(f"[🔗 Click to View](https://www.pinterest.com/search/pins/?q={query})")
+                query = st.session_state.chat_history[-1]["content"].replace("🔍", "").strip()
+                safe_query = quote(query)
 
-                st.markdown(f"### 🧨 Reddit NSFW Posts for: `{query}`")
-                st.markdown(f"[🔗 View NSFW](https://www.reddit.com/search/?q={query}%20nsfw&include_over_18=on)")
-            elif password != "":
-                st.error("🚫 Wrong password, bhai. Tu thoda chill kar.")
+                # 📌 Embedded Pinterest Gallery (via search)
+                st.markdown(f"#### 📸 Pinterest Results for: `{query}`")
+                st.components.v1.iframe(
+                    f"https://www.pinterest.com/search/pins/?q={safe_query}",
+                    height=400,
+                    scrolling=True
+                )
 
+                # 🧨 Embedded Reddit NSFW Search (requires login for full preview)
+                st.markdown(f"#### 🔥 Reddit NSFW for: `{query}`")
+                st.components.v1.iframe
+
+             
 # 🧹 Clear Chat
 col1, col2 = st.columns([6, 1])
 with col2:
