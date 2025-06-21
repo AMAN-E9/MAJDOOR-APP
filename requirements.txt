@@ -3,11 +3,4 @@ g4f
 aiohttp
 requests
 pillow
-lxml
-apkutils-patch
-androguard
-pyyaml
-bs4
-shutilwhich
-wolframalpha
-docext @ git+https://github.com/NanoNets/docext
+google-search-results
