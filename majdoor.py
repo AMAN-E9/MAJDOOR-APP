@@ -1,8 +1,6 @@
 import sys, os, streamlit as st, requests 
 import io
-from PIL import Image
-import wolframalpha  # pip install wolframalpha
-from docext.extract import get_text_from_image
+from serpapi import GoogleSearch
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
@@ -38,41 +36,40 @@ if "mode" not in st.session_state: st.session_state.mode = "normal"
 if st.session_state.user_name is None:
     st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:")
     st.stop()
-# 📂 APK Cleaner Feature Starts Here
-from apk_modder_advanced import mod_apk
-import os
 
-st.markdown("---")
-st.markdown("### 🔧 APK Cleaner - Majdoor AI")
+from serpapi import GoogleSearch
 
-apk_file = st.file_uploader("📂 Upload a Modded APK", type=["apk"])
+SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c0b9001f6feff31c8278b2309b73ca0d"
 
-if apk_file:
-    st.success("📦 APK received. Starting deep cleaning... 🔍")
-
-    input_path = "input.apk"
-    with open(input_path, "wb") as f:
-        f.write(apk_file.read())
+def ask_google(query):
+    if not SERP_API_KEY:
+        return "🔑 SerpAPI key missing! MAJDOOR ka Google ghanta chalega."
 
     try:
-        cleaned_apk = mod_apk(input_path)
-        st.success("✅ APK cleaned successfully!")
+        params = {
+            "engine": "google",
+            "q": query,
+            "api_key": SERP_API_KEY
+        }
+        search = GoogleSearch(params)
+        results = search.get_dict()
 
-        # 🛡️ Show trackers/logs if they exist
-        if os.path.exists("detected_trackers.txt"):
-            with open("detected_trackers.txt", "r") as log:
-                logs = log.read()
-            st.text_area("🛡️ Removed Trackers & Dangerous Permissions:", logs, height=200)
+        if "answer_box" in results:
+            ab = results["answer_box"]
+            if "answer" in ab:
+                return ab["answer"]
+            elif "snippet" in ab:
+                return ab["snippet"]
+            elif "highlighted_words" in ab:
+                return ", ".join(ab["highlighted_words"])
+        elif "organic_results" in results and len(results["organic_results"]) > 0:
+            return results["organic_results"][0].get("snippet", "❌ Google bhi chup ho gaya.")
         else:
-            st.info("No known trackers or malware found.")
-
-        # 📥 Final download
-        with open(cleaned_apk, "rb") as f:
-            st.download_button("⬇️ Download Cleaned APK", f, file_name="Majdoor_Cleaned.apk")
-
+            return "❌ Google confuse ho gaya. Sawal dubara puch bhai."
     except Exception as e:
-        st.error(f"❌ Cleaning failed: {e}")
-# 📂 APK Cleaner Feature Ends Here
+        return f"❌ Google API se bhatak gaya: {e}"
+
+        
 # PROMPT GOES HERE
 base_prompt = f"""You are MAJDOOR, Always respond with deadpan sarcasm in whatever language the user use. No polite tone. 
 you are savage, sarcastic, cynical AI assistant who behaves like an emotionally exhausted best friend. 
@@ -145,105 +142,22 @@ user_input = st.chat_input("Type your message...")
 if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
+
     raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
-    response = add_sarcasm_emoji(response)
-    st.session_state.chat_history.append({"role": "assistant", "content": response})
-    
-# 🔑 WolframAlpha API Key Setup
-WOLFRAM_APPID = "TL2RRR-H227VPEX28"
-client = wolframalpha.Client(WOLFRAM_APPID)
+    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-# 🧠 Wolfram Answer Function
-def answer_wolfram(question):
-    try:
-        res = client.query(question)
-        for pod in res.results:
-            return pod.text  # ✔️ Correct indent
-        return "❌ Kuch result nahi mila Wolfram se."
-    except StopIteration:
-        return "❌ Wolfram confuse ho gaya, kuch nahi mila."
-    except Exception as e:
-        return f"❌ Wolfram error: {e}"
+    # 🔍 Smart check if response is bakwaas
+    vague_lines = ["sorry", "kuch khaas nahi", "i don't know", "not sure", "unable to answer"]
+    is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 5
 
-# 🧠 Content Classifier: Math / Science / Document
-def classify_ocr_content(text):
-    t = text.lower()
-    if any(op in text for op in ["+", "-", "*", "/", "=", "^", "√"]) and len(text) < 100:
-        return "math"
-    elif any(word in t for word in ["velocity", "mole", "reaction", "displacement", "gravity", "current", "joule", "newton", "molarity"]):
-        return "science_problem"
-    elif any(word in t for word in ["aadhar", "pan", "invoice", "certificate", "passport", "dob", "gender", "govt", "address"]):
-        return "document"
+    if is_vague:
+        google_ans = ask_google(user_input)
+        response = f"🤷 GPT kuch bol nahi paya, toh MAJDOOR ne Google ki chappal uthayi:\n\n🔎 {google_ans}"
     else:
-        return "unknown"
-# 👁️ Camera Toggle Button — full switch behavior
-col1, col2 = st.columns([1, 6])
-with col1:
-  if "show_camera" not in st.session_state:
-    st.session_state.show_camera = False
+        response = add_sarcasm_emoji(response)
 
-toggle_clicked = st.button("👁️", help="Click to toggle camera", key="camera_toggle")
+    st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-if toggle_clicked:
-    st.session_state.show_camera = not st.session_state.show_camera
-# 🧠 Camera OCR Section + Smart Handling
-
-if st.session_state.get("show_camera", False):
-    st.markdown("## 📷 Photo se OCR aur MAJDOOR ki Bhasha")
-
-    img = st.camera_input("📸 Kheench le photo jisme dard chhupa ho")
-
-    if img is not None:
-        st.image(img, caption="📸 Teri captured image", use_container_width=True)
-
-        try:
-            # 🖼️ Save image
-            img_bytes = img.getvalue()
-            img_pil = Image.open(io.BytesIO(img_bytes))
-            img_pil.save("camera_input.png")
-
-            # 🧾 OCR using docext
-            extracted = get_text_from_image("camera_input.png")
-            text = extracted.get("text", "").strip()
-
-            if not text:
-                st.warning("📄 Image me kuch likha hi nahi mila bhai.")
-            else:
-                st.success(f"🧾 MAJDOOR ne padha: `{text}`")
-                ctype = classify_ocr_content(text)
-
-                if ctype == "math":
-                    st.info("📐 Math mila... Wolfram ko kaam pe lagaya")
-                    answer = answer_wolfram(text)
-                    st.success(f"📊 Jawab: `{answer}`")
-
-                elif ctype == "science_problem":
-                    st.info("🔬 Science ka jhanjhat... Wolfram se dard bhara jawab le")
-                    answer = answer_wolfram(text)
-                    st.success(f"📚 MAJDOOR ka dimaag: `{answer}`")
-
-                elif ctype == "document":
-                    st.info("📄 Lagta hai koi document hai... samjha jaa raha hai")
-
-                    st.session_state.chat_history.append({"role": "user", "content": f"Yeh document hai:\n\n{text}\n\nYeh kis type ka document ho sakta hai aur isme kya likha hai?"})
-                    messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
-                    raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-                    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
-                    st.session_state.chat_history.append({"role": "assistant", "content": response})
-                    st.markdown(f"📃 MAJDOOR ne samjhaya:\n\n{response}")
-
-                else:
-                    st.info("😐 Kuch samajh nahi aaya... normal sarcasm response de raha hoon")
-                    st.session_state.chat_history.append({"role": "user", "content": text})
-                    messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
-                    raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-                    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Kuch khaas nahi mila.")
-                    st.session_state.chat_history.append({"role": "assistant", "content": response})
-                    st.markdown(f"🤖 MAJDOOR: {response}")
-
-        except Exception as e:
-            st.error(f"❌ OCR ya answer fetch karte waqt error: {e}")
 
 # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
