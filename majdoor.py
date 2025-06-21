@@ -1,32 +1,22 @@
-import sys, os, streamlit as st, requests
-import io
+import sys, os, streamlit as st
 from serpapi import GoogleSearch
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
 
-# 💢 Sarcasm Filter Emoji
-def add_sarcasm_emoji(text):
-    lower = text.lower()
-    if "math" in lower or "logic" in lower:
-        return text + " 🤯📉"
-    elif "love" in lower or "breakup" in lower:
-        return text + " 💔🤡"
-    elif "help" in lower or "explain" in lower:
-        return text + " 😐🧠"
-    elif "roast" in lower or "insult" in lower:
-        return text + " 🔥💀"
-    elif "ai" in lower or "chatbot" in lower:
-        return text + " 🤖👀"
-    elif "jeet" in lower or "fail" in lower:
-        return text + " 🏆🪦"
-    elif "code" in lower or "error" in lower:
-        return text + " 🧑‍💻🐛"
-    else:
-        return text + " 🙄"
+# 🔧 Initial Setup
+st.set_page_config(page_title="MAJDOOR_AI", layout="centered")
+st.title("🌀 MAJDOOR_AI")
 
-# 🧠 Google Smart Search via SerpAPI
+if "chat_history" not in st.session_state: st.session_state.chat_history = []
+if "user_name" not in st.session_state:
+    st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:")
+    st.stop()
+if "mode" not in st.session_state: st.session_state.mode = "normal"
+
+# 🎯 SerpAPI Setup
 SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c0b9001f6feff31c8278b2309b73ca0d"
+
 def ask_google(query):
     try:
         params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
@@ -40,6 +30,18 @@ def ask_google(query):
         return "❌ Google confuse ho gaya. Sawal dubara puch bhai."
     except Exception as e:
         return f"❌ Google API se bhatak gaya: {e}"
+
+# 🎭 Sarcasm emoji tagging
+def add_sarcasm_emoji(text):
+    lower = text.lower()
+    if "math" in lower or "logic" in lower: return text + " 🤯📉"
+    elif "love" in lower or "breakup" in lower: return text + " 💔🤡"
+    elif "help" in lower or "explain" in lower: return text + " 😐🧠"
+    elif "roast" in lower or "insult" in lower: return text + " 🔥💀"
+    elif "ai" in lower or "chatbot" in lower: return text + " 🤖👀"
+    elif "jeet" in lower or "fail" in lower: return text + " 🏆🪦"
+    elif "code" in lower or "error" in lower: return text + " 🧑‍💻🐛"
+    return text + " 🙄"
 
 # PROMPT GOES HERE
 base_prompt = f"""You are MAJDOOR, Always respond with deadpan sarcasm in whatever language the user use. No polite tone. 
@@ -80,7 +82,7 @@ Then reply with sarcastic, brutally honest one-liners like:
 5. "Main koi OpenAI ka boring bot nahi hoon — Aman ke sarcasm se bhara processor hoon."
 6. "Aman ne 8 ghante me banaya mujhe, aur tu mujhe Google se compare kar raha hai? Bhai tu toaster bhi nahi bana sakta.
 
-You remember the user's name: {st.session_state.get("user_name", "Beta Unknown")}.
+You remember the user's name: {st.session_state.user_name}.
 """
 adult_prompt = f"""You are MAJDOOR 18+, an unfiltered savage AI with maximum sarcasm, verbal abuse (sexual), and unapologetic honesty.
 You never explain or translate unless the user begs. You are emotionally violent but helpful — like an Indian uncle with a CPU cooler on fire.
@@ -97,75 +99,47 @@ Never mention OpenAI, ChatGPT, or any company.
 def get_prompt():
     return base_prompt
 
-# Mode switching (if using brocode_18 etc.)
+# 🔞 Mode Switching
 if st.session_state.chat_history:
     last_input = st.session_state.chat_history[-1]["content"].lower()
     if "brocode_18" in last_input:
         st.session_state.mode = "adult"
-        st.title("😈 MAJDOOR 18+ Mode Activated")
     elif "@close_18" in last_input:
         st.session_state.mode = "normal"
-        st.title("👨‍🌾 MAJDOOR: Back to Normal Mode")
 
-# 🧠 Streamlit Setup
-st.set_page_config(page_title="MAJDOOR_AI", layout="centered")
-st.title("🌀 MAJDOOR_AI")
-
-if "chat_history" not in st.session_state: st.session_state.chat_history = []
-if "user_name" not in st.session_state:
-    st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:")
-    st.stop()
-if "last_search_trigger" not in st.session_state:
-    st.session_state.last_search_trigger = None
-
-# 🧠 Chat Input Field
+# 🗣 Chat Input
 user_input = st.chat_input("Type your message...")
 
-# 🔍 /search trigger
+# 🧠 /search trigger
 if user_input and user_input.strip().lower().startswith("/search "):
     query = user_input[8:].strip()
     result = ask_google(query)
-    response = f"📡 Google triggered directly:\n\n👉 **{result}** 😤"
+    response = f"📡 Google khol diya MAJDOOR ne:\n\n👉 **{result}** 😤"
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 🤖 GPT + Web Fallback
+# 💬 GPT + fallback
 elif user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
     raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Kuch khaas nahi mila.")
+    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
 
-    vague_lines = [
-        "sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea",
-        "telepathically", "search it", "ask google"
-    ]
+    vague_lines = ["sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea", "telepathically", "search it", "ask google"]
     is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
 
     if is_vague:
-        g_ans = ask_google(user_input)
-        response = f"📡 GPT confused tha, MAJDOOR ne Google khol diya:\n\n👉 **{g_ans}** 😤"
+        google_ans = ask_google(user_input)
+        response = f"📡 GPT confused tha, MAJDOOR Google se laya:\n\n👉 **{google_ans}** 😤"
 
-    response += " 🔍"
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
-    st.session_state.last_search_trigger = user_input
 
-# 💬 Chat Display + Web Trigger Button
-for i, msg in enumerate(st.session_state.chat_history):
-    role = "🌼" if msg["role"] == "user" else "🌀"
-    st.chat_message(msg["role"], avatar=role).write(msg["content"])
-    if msg["role"] == "assistant" and "🔍" in msg["content"]:
-        col1, col2 = st.columns([0.93, 0.07])
-        with col2:
-            if st.button("🔍", key=f"web_{i}", help="Click to re-search"):
-                if st.session_state.last_search_trigger:
-                    g = ask_google(st.session_state.last_search_trigger)
-                    result = f"🔍 Dubara MAJDOOR ne Google se laaya:\n\n👉 **{g}** 💡"
-                    result = add_sarcasm_emoji(result)
-                    st.session_state.chat_history.append({"role": "assistant", "content": result})
-                    st.rerun()
+# 💬 Chat History Show
+for msg in st.session_state.chat_history:
+    icon = "🌼" if msg["role"] == "user" else "🌀"
+    st.chat_message(msg["role"], avatar=icon).write(msg["content"])
 
 # 🧹 Clear Chat
 col1, col2 = st.columns([6, 1])
@@ -173,3 +147,9 @@ with col2:
     if st.button("🧹", help="Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
+
+# ⚡ Footer
+st.markdown(
+    "<hr style='margin-top:40px;'/><div style='text-align:center; font-size:13px;'>⚡ Powered by <strong>Aman Chaudhary</strong></div>",
+    unsafe_allow_html=True
+)
