@@ -148,8 +148,14 @@ with col2:
         st.session_state.chat_history = []
         st.rerun()
 
-# ⚡ Footer
+# 🪪 Footer Credit
 st.markdown(
-    "<hr style='margin-top:40px;'/><div style='text-align:center; font-size:13px;'>⚡ Powered by <strong>Aman Chaudhary</strong></div>",
+    """
+    <hr style='margin-top:40px;border:1px solid #444;'/>
+    <div style='text-align:center; color:gray; font-size:13px;'>
+        ⚡ Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm
+    </div>
+    """,
     unsafe_allow_html=True
 )
+
