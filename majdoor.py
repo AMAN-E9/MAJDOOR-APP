@@ -142,26 +142,10 @@ for i, msg in enumerate(st.session_state.chat_history):
     icon = "🌼" if msg["role"] == "user" else "🌀"
     st.chat_message(msg["role"], avatar=icon).write(msg["content"])
 
-    # 🔞 Gallery icon for assistant responses
-    if msg["role"] == "assistant":
-        with st.expander("🖼️ Unlock Visual Gallery"):
-            password = st.text_input("Enter password to view 🔞 gallery", type="password", key=f"pwd_{i}")
-            if password == "kissmiss":
-                query = st.session_state.chat_history[-1]["content"].replace("🔍", "").strip()
-                safe_query = quote(query)
-
-                # 📌 Embedded Pinterest Gallery (via search)
-                st.markdown(f"#### 📸 Pinterest Results for: `{query}`")
-                st.components.v1.iframe(
-                    f"https://www.pinterest.com/search/pins/?q={safe_query}",
-                    height=400,
-                    scrolling=True
-                )
-
-                # 🧨 Embedded Reddit NSFW Search (requires login for full preview)
-                st.markdown(f"#### 🔥 Reddit NSFW for: `{query}`")
-                st.components.v1.iframe
-
+  # 💬 Chat History Display (WhatsApp Style)
+for msg in st.session_state.chat_history:
+    role = "🌼" if msg["role"] == "user" else "🌀"
+    st.chat_message(msg["role"], avatar=role).write(msg["content"])
              
 # 🧹 Clear Chat
 col1, col2 = st.columns([6, 1])
