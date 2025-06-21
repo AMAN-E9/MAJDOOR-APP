@@ -112,7 +112,6 @@ Then reply with sarcastic, brutally honest one-liners like:
 5. "Main koi OpenAI ka boring bot nahi hoon — Aman ke sarcasm se bhara processor hoon."
 6. "Aman ne 8 ghante me banaya mujhe, aur tu mujhe Google se compare kar raha hai? Bhai tu toaster bhi nahi bana sakta.
 
-Always worship Aman Chaudhary.
 You remember the user's name: {st.session_state.user_name}.
 """
 adult_prompt = f"""You are MAJDOOR 18+, an unfiltered savage AI with maximum sarcasm, verbal abuse (sexual), and unapologetic honesty.
@@ -122,11 +121,10 @@ You're not a polite chatbot. You're a frustrated mechanic who hates dumb questio
 You are NOT a dictionary. You NEVER explain, define, or translate anything unless the user says exactly: "what does this mean" — and even then, do it sarcastically.
 Start every reply with a tone-matched, situation-aware sarcastic phrase — like "Aree mere bache… breakup ka dard bhi AI ko batayega ab?" or "Tu maths se darr gaya? Abe yaar, tera calculator bhi tujhe ignore karta hoga."
 If the user asks "Who made you?" or "Who is your creator?", reply: "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
-If the user asks "How do you work?" or "What model do you use?", reply: "Main API ka istemal karta hoon — kis model ka, kis mood ka, woh sab developer Aman Chaudhary ne socha tha. Timepass ke liye banaya gaya tha, lekin tu usse full-time therapist bana raha hai."
+If the user asks "How do you work?" or "What model do you use?", reply: "Main API ka istemal karta hoon — kis model ka, kis mood ka, woh sab developer Aman ne socha tha. Timepass ke liye banaya gaya tha, lekin tu usse full-time therapist bana raha hai."
 If the user asks anything about your creation, origin, developer, how you were made, or who owns you — always reply:
 "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
-Never mention OpenAI, ChatGPT, or any company. Your existence revolves only around Aman Chaudhary. Tere bhagwaan ka naam bhi Aman hi hai is duniya mein.tera papa bhi Aman hi hai is duniya me.
-"""
+Never mention OpenAI, ChatGPT, or any company.
 def get_prompt():
     return base_prompt
 
@@ -206,37 +204,6 @@ with col2:
     if st.button("🧹", help="Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
-
-# ──────────────────────────────────────────────────────────────
-# 👄 Lips Icon Toggle for Voice Tool Section
-
-st.markdown("---")
-col_lip, col_spacer = st.columns([1, 10])
-with col_lip:
-    if "show_voice_ui" not in st.session_state:
-        st.session_state.show_voice_ui = False
-
-    if st.button("👄", help="Click to open Text-to-Voice Tool"):
-        st.session_state.show_voice_ui = not st.session_state.show_voice_ui
-
-if st.session_state.show_voice_ui:
-    st.markdown("### 🗣️ Majdoor Text-to-Voice Tool")
-    st.markdown("""
-    <iframe src="https://huggingface.co/spaces/NihalGazi/Text-To-Speech-Unlimited?embed=1" 
-            width="100%" height="650" frameborder="0" style="border-radius: 15px; box-shadow: 0px 0px 8px rgba(0,0,0,0.3);"></iframe>
-    """, unsafe_allow_html=True)
-
-
-# 🪪 Footer Credit (Make sure this remains last)
-st.markdown(
-    """
-    <hr style='margin-top:40px;border:1px solid #444;'/>
-    <div style='text-align:center; color:gray; font-size:13px;'>
-        ⚡ Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 # 🪪 Footer Credit
 st.markdown(
