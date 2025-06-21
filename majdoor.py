@@ -136,12 +136,6 @@ elif user_input:
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-from urllib.parse import quote
-
-for i, msg in enumerate(st.session_state.chat_history):
-    icon = "🌼" if msg["role"] == "user" else "🌀"
-    st.chat_message(msg["role"], avatar=icon).write(msg["content"])
-
   # 💬 Chat History Display (WhatsApp Style)
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
