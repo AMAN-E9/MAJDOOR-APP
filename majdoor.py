@@ -5,7 +5,8 @@ from serpapi import GoogleSearch
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
 
-# Emoji Flavored Sarcasm
+# Sarcasm Emoji Attachment
+
 def add_sarcasm_emoji(text):
     lower = text.lower()
     if "math" in lower or "logic" in lower:
@@ -37,8 +38,7 @@ if st.session_state.user_name is None:
     st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:")
     st.stop()
 
-from serpapi import GoogleSearch
-
+# SERPAPI Setup
 SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c0b9001f6feff31c8278b2309b73ca0d"
 
 def ask_google(query):
@@ -69,7 +69,7 @@ def ask_google(query):
     except Exception as e:
         return f"❌ Google API se bhatak gaya: {e}"
 
-        
+# PROMPTS
 # PROMPT GOES HERE
 base_prompt = f"""You are MAJDOOR, Always respond with deadpan sarcasm in whatever language the user use. No polite tone. 
 you are savage, sarcastic, cynical AI assistant who behaves like an emotionally exhausted best friend. 
@@ -126,7 +126,7 @@ Never mention OpenAI, ChatGPT, or any company.
 def get_prompt():
     return base_prompt
 
-# Mode switching (if using brocode_18 etc.)
+# Mode switching
 if st.session_state.chat_history:
     last_input = st.session_state.chat_history[-1]["content"].lower()
     if "brocode_18" in last_input:
@@ -136,53 +136,52 @@ if st.session_state.chat_history:
         st.session_state.mode = "normal"
         st.title("👨‍🌾 MAJDOOR: Back to Normal Mode")
 
-  # 🧠 Chat Input
-user_input = st.chat_input("Type your message...")
+# Chat Input
+col1, col2 = st.columns([8, 1])
+with col1:
+    user_input = st.chat_input("Type your message...")
+with col2:
+    if st.button("🔍", help="Force Google Search") and user_input:
+        google_result = ask_google(user_input)
+        response = f"📡 Google triggered directly:
+
+👉 **{google_result}**"
+        response = add_sarcasm_emoji(response)
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        st.rerun()
 
 if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
     raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
     response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
-    
-    # 🧠 Sarcastic fallback checker
-    vague_lines = [
-        "sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea",
-        "do i look like", "ask google", "telepathically", "search it", "literally type"
-    ]
+
+    vague_lines = ["sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea", "do i look like", "ask google", "search it"]
     is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
 
     if is_vague:
         google_ans = ask_google(user_input)
-        response = f"📡 GPT toh sarcasm me uljha tha, MAJDOOR ne Google se jawab nikaal diya:\n\n👉 **{google_ans}** 😏"
+        response = f"📡 GPT confuse ho gaya, MAJDOOR ne Google se nikaala:
+
+👉 **{google_ans}**"
 
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 🔍 Extra Trigger: Manual Google Search via Majdoor
-with st.form(key="search_form", clear_on_submit=True):
-    manual_search = st.text_input("🔍 GPT bakwaas kare? Seedha MAJDOOR Google se laayega:", placeholder="Type here...")
-    search_button = st.form_submit_button("📡 Search Google")
-
-if search_button and manual_search.strip():
-    google_result = ask_google(manual_search)
-    response = f"📡 GPT toh thak gaya tha, MAJDOOR Google se laaya:\n\n👉 **{google_result}** 😤"
-    response = add_sarcasm_emoji(response)
-    st.session_state.chat_history.append({"role": "user", "content": manual_search})
-    st.session_state.chat_history.append({"role": "assistant", "content": response})
-
-# 💬 Chat History Display (WhatsApp Style)
+# Chat Display
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
     st.chat_message(msg["role"], avatar=role).write(msg["content"])
 
-# 🧹 Clear Chat Button — Right Side Me
+# Clear Chat
 col1, col2 = st.columns([6, 1])
 with col2:
     if st.button("🧹", help="Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
-# 🪪 Footer Credit
+
+# Footer
 st.markdown(
     """
     <hr style='margin-top:40px;border:1px solid #444;'/>
@@ -192,4 +191,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
