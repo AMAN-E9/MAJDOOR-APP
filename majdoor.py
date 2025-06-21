@@ -210,7 +210,7 @@ st.markdown(
     """
     <hr style='margin-top:40px;border:1px solid #444;'/>
     <div style='text-align:center; color:gray; font-size:13px;'>
-        "⚡" Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm
+        "⚡ Powered by <strong>Aman Chaudhary</strong> | Built with ❤️ & sarcasm"
     </div>
     """,
     unsafe_allow_html=True
