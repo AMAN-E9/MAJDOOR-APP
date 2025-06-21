@@ -1,4 +1,3 @@
-# ⚙️ Preloaded Libraries
 import sys, os, streamlit as st, requests
 import io
 from serpapi import GoogleSearch
@@ -97,8 +96,8 @@ Never mention OpenAI, ChatGPT, or any company.
 """
 def get_prompt():
     return base_prompt
-  
-# Mode switching
+
+# Mode switching (if using brocode_18 etc.)
 if st.session_state.chat_history:
     last_input = st.session_state.chat_history[-1]["content"].lower()
     if "brocode_18" in last_input:
@@ -113,13 +112,16 @@ st.set_page_config(page_title="MAJDOOR_AI", layout="centered")
 st.title("🌀 MAJDOOR_AI")
 
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
-if "user_name" not in st.session_state: st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:"); st.stop()
-if "last_search_trigger" not in st.session_state: st.session_state.last_search_trigger = None
+if "user_name" not in st.session_state:
+    st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:")
+    st.stop()
+if "last_search_trigger" not in st.session_state:
+    st.session_state.last_search_trigger = None
 
-# 🧠 User Message Input
+# 🧠 Chat Input Field
 user_input = st.chat_input("Type your message...")
 
-# 🔍 Search Trigger via `/search <text>`
+# 🔍 /search trigger
 if user_input and user_input.strip().lower().startswith("/search "):
     query = user_input[8:].strip()
     result = ask_google(query)
@@ -128,31 +130,36 @@ if user_input and user_input.strip().lower().startswith("/search "):
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 🤖 GPT Fallback + Search
+# 🤖 GPT + Web Fallback
 elif user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
     raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
     response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Kuch khaas nahi mila.")
-    
-    vague_lines = ["sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea", "search it", "telepathically"]
-    if any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15:
+
+    vague_lines = [
+        "sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea",
+        "telepathically", "search it", "ask google"
+    ]
+    is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
+
+    if is_vague:
         g_ans = ask_google(user_input)
         response = f"📡 GPT confused tha, MAJDOOR ne Google khol diya:\n\n👉 **{g_ans}** 😤"
-    
+
     response += " 🔍"
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
     st.session_state.last_search_trigger = user_input
 
-# 🧠 Chat History + 🔍 Emoji Trigger
+# 💬 Chat Display + Web Trigger Button
 for i, msg in enumerate(st.session_state.chat_history):
     role = "🌼" if msg["role"] == "user" else "🌀"
     st.chat_message(msg["role"], avatar=role).write(msg["content"])
     if msg["role"] == "assistant" and "🔍" in msg["content"]:
         col1, col2 = st.columns([0.93, 0.07])
         with col2:
-            if st.button("🔍", key=f"web_{i}", help="Click to re-search web"):
+            if st.button("🔍", key=f"web_{i}", help="Click to re-search"):
                 if st.session_state.last_search_trigger:
                     g = ask_google(st.session_state.last_search_trigger)
                     result = f"🔍 Dubara MAJDOOR ne Google se laaya:\n\n👉 **{g}** 💡"
@@ -160,7 +167,7 @@ for i, msg in enumerate(st.session_state.chat_history):
                     st.session_state.chat_history.append({"role": "assistant", "content": result})
                     st.rerun()
 
-# 🧹 Clear Chat Button
+# 🧹 Clear Chat
 col1, col2 = st.columns([6, 1])
 with col2:
     if st.button("🧹", help="Clear Chat History"):
