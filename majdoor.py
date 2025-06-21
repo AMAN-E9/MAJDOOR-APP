@@ -152,22 +152,33 @@ with col2:
         st.rerun()
 
 if user_input:
-    st.session_state.chat_history.append({"role": "user", "content": user_input})
-    messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
-    raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+    if user_input.lower().startswith("g/"):
+        query = user_input[7:].strip()
+        google_result = ask_google(query)
+        response = f"📡 Tera 'search/' dekh ke MAJDOOR ne Google pe dhoondh mara:\n\n👉 **{google_result}** 😏"
+        response = add_sarcasm_emoji(response)
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+    else:
+        # Normal GPT flow
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
+        raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
+        response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
 
-    vague_lines = ["sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea", "do i look like", "ask google", "search it"]
-    is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
+        vague_lines = [
+            "sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea",
+            "do i look like", "ask google", "telepathically", "search it", "literally type"
+        ]
+        is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
 
-    if is_vague:
-        google_ans = ask_google(user_input)
-        response = f"📡 GPT confuse ho gaya, MAJDOOR ne Google se nikaala:
+        if is_vague:
+            google_ans = ask_google(user_input)
+            response = f"📡 GPT sarcasm me atka tha, MAJDOOR ne Google se kheecha:\n\n👉 **{google_ans}** 😏"
 
-👉 **{google_ans}**"
+        response = add_sarcasm_emoji(response)
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-    response = add_sarcasm_emoji(response)
-    st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 # Chat Display
 for msg in st.session_state.chat_history:
