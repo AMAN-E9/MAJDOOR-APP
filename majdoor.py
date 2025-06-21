@@ -111,7 +111,7 @@ if st.session_state.chat_history:
 user_input = st.chat_input("Type your message...")
 
 # 🧠 /search trigger
-if user_input and user_input.strip().lower().startswith("/search "):
+if user_input and user_input.strip().lower().startswith("g/ "):
     query = user_input[8:].strip()
     result = ask_google(query)
     response = f"📡 Google khol diya MAJDOOR ne:\n\n👉 **{result}** 😤"
