@@ -110,29 +110,21 @@ if st.session_state.chat_history:
 # 🗣 Chat Input
 user_input = st.chat_input("Type your message...")
 
-# 🧠 /search trigger
+# 🧠 g/ trigger (manual web search only)
 if user_input and user_input.strip().lower().startswith("g/ "):
-    query = user_input[8:].strip()
+    query = user_input[3:].strip()
     result = ask_google(query)
     response = f"📡 Google khol diya MAJDOOR ne:\n\n👉 **{result}** 😤"
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 💬 GPT + fallback
+# 🤖 GPT response without fallback
 elif user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
     raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
     response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
-
-    vague_lines = ["sorry", "kuch khaas", "not sure", "i don't", "unable", "no idea", "telepathically", "search it", "ask google"]
-    is_vague = any(v in response.lower() for v in vague_lines) or len(response.strip()) < 15
-
-    if is_vague:
-        google_ans = ask_google(user_input)
-        response = f"📡 GPT confused tha, MAJDOOR Google se laya:\n\n👉 **{google_ans}** 😤"
-
     response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
