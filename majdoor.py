@@ -5,30 +5,15 @@ from serpapi import GoogleSearch
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
 
-# ⚠️ Remove or guard direct import of g4f.internet; use fallback if missing
+# 🔧 Fallback for search: try g4f.internet.search, else use DuckDuckGo
 try:
-    from g4f.internet import search as g4f_search  # if your version has it
+    from g4f.internet import search  # if this exists in your g4f version
 except ImportError:
-    g4f_search = None
-
-# Try to import DuckDuckGo search for text
-try:
     from duckduckgo_search import DDGS
-except ImportError:
-    DDGS = None
-
-# For image search via DuckDuckGo
-# duckduckgo_search DDGS can fetch images as well.
-# We'll check if DDGS supports .images() or fallback to scraping via beautifulsoup if needed.
-try:
-    # Test if DDGS().images exists
-    if DDGS:
-        _ddgs_test = DDGS()
-        has_image_search = hasattr(_ddgs_test, "images") or hasattr(_ddgs_test, "image")
-    else:
-        has_image_search = False
-except:
-    has_image_search = False
+    def search(query):
+        with DDGS() as ddgs:
+            items = list(ddgs.text(query, region='wt-wt', safesearch='Off', max_results=1))
+        return items[0].get('body') if items else "Kuch bhi nahi mila duck se bhai."
 
 # For image generation via g4f.Provider.bing if available
 try:
@@ -49,7 +34,7 @@ if "mode" not in st.session_state:
     st.session_state.mode = "normal"
 
 # 🏫 SerpAPI (as backup for prefix g/)
-SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c8278b2309b73ca0d"
+SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c2309b73ca0d"
 def ask_google_backup(query):
     try:
         params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
@@ -64,7 +49,7 @@ def ask_google_backup(query):
     except Exception as e:
         return f"❌ Google API se bhatak gaya: {e}"
 
-# 🎭 Sarcasm tagging (unchanged)
+# 🎭 Sarcasm tagging
 def add_sarcasm_emoji(text):
     lower = text.lower()
     if "math" in lower or "logic" in lower:
@@ -160,13 +145,9 @@ def handle_triggered_response(text):
 
     # Prefix dd/: use DuckDuckGo text search
     elif text.startswith("dd/ "):
-        if DDGS is None:
-            return "❌ DuckDuckGo search module missing."
-        query = text[4:].strip()
         try:
             with DDGS() as ddgs:
-                # Use text search, get top snippet
-                items = list(ddgs.text(query, region='wt-wt', safesearch='Off', max_results=1))
+                items = list(ddgs.text(text[4:].strip(), region='wt-wt', safesearch='Off', max_results=1))
             if items:
                 body = items[0].get('body') or items[0].get('title') or "Kuch bhi nahi mila duck se."
                 return f"🌐 DuckDuckGo se mila jawab:\n\n👉 **{body}** 😤"
@@ -175,27 +156,20 @@ def handle_triggered_response(text):
         except Exception as e:
             return f"❌ DuckDuckGo search mein error: {e}"
 
-    # Prefix img/: fetch image URLs via DuckDuckGo image search
+    # Prefix img/: fetch image URLs via Bing provider or DuckDuckGo
     elif text.startswith("img/ "):
         prompt = text[5:].strip()
-        # First try g4f.Provider.bing if available
         if bing:
             try:
                 imgs = bing.create_images(prompt)
                 if imgs:
-                    # show first image URL
                     return f"🖼️ Bing-image-provider se image:\n\n![image]({imgs[0]})"
-                else:
-                    # fallback to DuckDuckGo image search
-                    pass
             except:
-                # fallback below
                 pass
         # DuckDuckGo image search fallback
-        if DDGS and has_image_search:
+        if 'DDGS' in globals() and hasattr(DDGS, 'images') or hasattr(DDGS, 'image'):
             try:
                 with DDGS() as ddgs:
-                    # Some versions offer ddgs.images(query)
                     if hasattr(ddgs, "images"):
                         hits = list(ddgs.images(prompt, region='wt-wt', safesearch='Off', max_results=1))
                     elif hasattr(ddgs, "image"):
@@ -203,21 +177,19 @@ def handle_triggered_response(text):
                     else:
                         hits = []
                 if hits:
-                    # each hit may have 'image' or 'thumbnail'
                     url = hits[0].get('image') or hits[0].get('thumbnail') or hits[0].get('url')
                     if url:
                         return f"🖼️ DuckDuckGo se image:\n\n![image]({url})"
                 return "❌ Koi image nahi mila duck se."
             except Exception as e:
                 return f"❌ Duck image search error: {e}"
-        else:
-            return "❌ Image feature unavailable (no bing provider, no DDGS.image)."
+        return "❌ Image feature unavailable."
+
     return None
 
 # 🧠 Chat Handler
 if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
-    # use lowercase for prefix detection, but keep original for search text
     trig = handle_triggered_response(user_input.strip())
     if trig:
         response = add_sarcasm_emoji(trig)
@@ -249,4 +221,4 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-)
+        )
