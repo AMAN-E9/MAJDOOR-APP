@@ -4,3 +4,6 @@ aiohttp
 requests
 pillow
 google-search-results
+serpapi
+duckduckgo-search>=5.0
+beautifulsoup4
