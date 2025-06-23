@@ -1,9 +1,8 @@
 streamlit
-g4f
+g4f @ git+https://github.com/xtekky/gpt4free   # or -e ./gpt4free if local clone
 aiohttp
 requests
 pillow
 google-search-results
-serpapi
 duckduckgo-search>=5.0
 beautifulsoup4
