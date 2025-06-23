@@ -121,17 +121,18 @@ def handle_triggered_response(text):
             result = search(query)  # internal
         except:
             result = ask_google_backup(query)
-        return f"📱 Internal search ka jawab:\n\n👉 **{result}** 😤
+        return f"📱 Internal search ka jawab:\n\n👉 **{result}** 😤"
+
     elif text.startswith("img/ "):
         prompt = text[5:].strip()
         try:
             imgs = bing.create_images(prompt)
-            if imgs: return f"🖼️ Image mil gaya:
-
-![image]({imgs[0]})"
+            if imgs:
+                return f"🖼️ Image mil gaya:\n\n![image]({imgs[0]})"
             return "❌ Koi image nahi mila. Prompt sahi daal."
         except:
             return "❌ Image banate waqt kuch phat gaya."
+
     return None
 
 # 🧠 Chat Handler
