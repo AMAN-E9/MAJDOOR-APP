@@ -121,8 +121,7 @@ def handle_triggered_response(text):
             result = search(query)  # internal
         except:
             result = ask_google_backup(query)
-        return f"📱 Internal search ka jawab:
-
+        return f"📱 Internal search ka jawab:\n\n👉 **{result}** 😤"
 👉 **{result}** 😠"
 
     elif text.startswith("img/ "):
