@@ -3,6 +3,8 @@ from serpapi import GoogleSearch
 
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
+from g4f.internet import search  # duckduckgo-search based internal
+from g4f.Provider import bing     # bing.create_images prompt-based
 
 # 🔧 Initial Setup
 st.set_page_config(page_title="MAJDOOR_AI", layout="centered")
@@ -14,10 +16,10 @@ if "user_name" not in st.session_state:
     st.stop()
 if "mode" not in st.session_state: st.session_state.mode = "normal"
 
-# 🎯 SerpAPI Setup
+# 🏫 SerpAPI (as backup)
 SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c0b9001f6feff31c8278b2309b73ca0d"
 
-def ask_google(query):
+def ask_google_backup(query):
     try:
         params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
         search = GoogleSearch(params)
@@ -31,10 +33,10 @@ def ask_google(query):
     except Exception as e:
         return f"❌ Google API se bhatak gaya: {e}"
 
-# 🎭 Sarcasm emoji tagging
+# 🎭 Sarcasm tagging
 def add_sarcasm_emoji(text):
     lower = text.lower()
-    if "math" in lower or "logic" in lower: return text + " 🤯📉"
+    if "math" in lower or "logic" in lower: return text + " 🧯📉"
     elif "love" in lower or "breakup" in lower: return text + " 💔🤡"
     elif "help" in lower or "explain" in lower: return text + " 😐🧠"
     elif "roast" in lower or "insult" in lower: return text + " 🔥💀"
@@ -97,10 +99,11 @@ If the user asks anything about your creation, origin, developer, how you were m
 "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
 Never mention OpenAI, ChatGPT, or any company.
 """
-def get_prompt():
-    return base_prompt
 
-# 🔞 Mode Switching
+def get_prompt():
+    return adult_prompt if st.session_state.mode == "adult" else base_prompt
+
+# 🔞 Switch Modes
 if st.session_state.chat_history:
     last_input = st.session_state.chat_history[-1]["content"].lower()
     if "brocode_18" in last_input:
@@ -108,40 +111,58 @@ if st.session_state.chat_history:
     elif "@close_18" in last_input:
         st.session_state.mode = "normal"
 
-# 🗣 Chat Input
 user_input = st.chat_input("Type your message...")
 
-# 🧠 g/ trigger (manual web search only)
-if user_input and user_input.strip().lower().startswith("g/ "):
-    query = user_input[3:].strip()
-    result = ask_google(query)
-    response = f"📡 Google khol diya MAJDOOR ne:\n\n👉 **{result}** 😤"
-    response = add_sarcasm_emoji(response)
+# 💡 Web/Image triggers
+def handle_triggered_response(text):
+    if text.startswith("g/ "):
+        query = text[3:].strip()
+        try:
+            result = search(query)  # internal
+        except:
+            result = ask_google_backup(query)
+        return f"📱 Internal search ka jawab:
+
+👉 **{result}** 😠"
+
+    elif text.startswith("img/ "):
+        prompt = text[5:].strip()
+        try:
+            imgs = bing.create_images(prompt)
+            if imgs: return f"🖼️ Image mil gaya:
+
+![image]({imgs[0]})"
+            return "❌ Koi image nahi mila. Prompt sahi daal."
+        except:
+            return "❌ Image banate waqt kuch phat gaya."
+    return None
+
+# 🧠 Chat Handler
+if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
+    trig = handle_triggered_response(user_input.strip().lower())
+    if trig:
+        response = add_sarcasm_emoji(trig)
+    else:
+        messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
+        raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
+        response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+        response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 🤖 GPT response without fallback
-elif user_input:
-    st.session_state.chat_history.append({"role": "user", "content": user_input})
-    messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
-    raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-    response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
-    response = add_sarcasm_emoji(response)
-    st.session_state.chat_history.append({"role": "assistant", "content": response})
-
-  # 💬 Chat History Display (WhatsApp Style)
+# 💬 History
 for msg in st.session_state.chat_history:
     role = "🌼" if msg["role"] == "user" else "🌀"
     st.chat_message(msg["role"], avatar=role).write(msg["content"])
-             
-# 🧹 Clear Chat
+
+# 🪟 Clear
 col1, col2 = st.columns([6, 1])
 with col2:
-    if st.button("🧹", help="Clear Chat History"):
+    if st.button("🪟", help="Clear Chat History"):
         st.session_state.chat_history = []
         st.rerun()
 
-# 🪪 Footer Credit
+# 🏦 Footer
 st.markdown(
     """
     <hr style='margin-top:40px;border:1px solid #444;'/>
