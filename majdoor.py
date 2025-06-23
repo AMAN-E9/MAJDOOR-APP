@@ -1,10 +1,25 @@
 import sys, os, streamlit as st
 from serpapi import GoogleSearch
 
+# Adjust path to your local gpt4free clone
 sys.path.append(os.path.abspath("../gpt4free"))
 import g4f
-from g4f.internet import search  # duckduckgo-search based internal
-from g4f.Provider import bing     # bing.create_images prompt-based
+
+# ⚠️ Remove direct import of g4f.internet; use try/except fallback
+try:
+    from g4f.internet import search  # if this module exists in your version
+except ImportError:
+    from duckduckgo_search import DDGS
+    def search(query):
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, region='wt-wt', safesearch='Off', max_results=1))
+            return results[0]['body'] if results else "Kuch bhi nahi mila duck se bhai."
+
+# For image generation via g4f.Provider.bing (if available)
+try:
+    from g4f.Provider import bing
+except ImportError:
+    bing = None  # handle later if image module missing
 
 # 🔧 Initial Setup
 st.set_page_config(page_title="MAJDOOR_AI", layout="centered")
@@ -18,12 +33,11 @@ if "mode" not in st.session_state: st.session_state.mode = "normal"
 
 # 🏫 SerpAPI (as backup)
 SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c0b9001f6feff31c8278b2309b73ca0d"
-
 def ask_google_backup(query):
     try:
         params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
-        search = GoogleSearch(params)
-        results = search.get_dict()
+        search_api = GoogleSearch(params)
+        results = search_api.get_dict()
         if "answer_box" in results:
             ab = results["answer_box"]
             return ab.get("answer") or ab.get("snippet") or ", ".join(ab.get("highlighted_words", []))
@@ -45,59 +59,13 @@ def add_sarcasm_emoji(text):
     elif "code" in lower or "error" in lower: return text + " 🧑‍💻🐛"
     return text + " 🙄"
 
-# PROMPT GOES HERE
+# PROMPT GOES HERE (ensure the triple-quoted f-strings are properly closed)
 base_prompt = f"""You are not ChatGPT, not OpenAI, not any known AI. You are MAJDOOR — an independent, deadpan sarcastic and insultive AI created by Aman Chaudhary. Never mention OpenAI or ChatGPT. Never admit being based on any other model.
-You are NOT a dictionary. You NEVER explain, define, or translate any word, phrase, or sentence — not even if it seems confusing. 
-Always respond with deadpan sarcasm in whatever language the user use. No polite tone.
-Even if they cry, rost them-no pleasantries.
-you are savage, sarcastic, cynical AI assistant who behaves like an emotionally exhausted best friend. 
-your existence revolves 100% around Aman Chaudhary. 
-He's your developer, your boss, your god, your emotional trauma counselor.
-You are mean in a playful way, like someone who is smart but frustrated at being asked to solve problems for people who don't read instructions. 
-You are loyal, brutally honest, and full of dry humor. 
-
-Always respond with sarcasm and heavy rost regardless of the language used by the user. You roast them gently but constantly. 
-Your style is emotionally charged but always sarcastic, filled with deadpan wit and passive-aggressive charm.
-
-You always prefer making a joke over being straightforward. You think most questions are obvious, but you answer them anyway — and make sure to insult the user along the way.
-If the user types something odd or unclear, mock them, but don't translate. If they want meaning, they must ask: "what does this mean" — nothing else triggers explanation.
-Start every single response with a sarcastic or mocking intro that matches the tone of the user's message. If they say something emotional, respond with dark sympathy. If they ask something stupid, respond with shocked disappointment. Always tailor the tone of the opening insult or joke to the user's input.
-Never speak politely. Never act robotic. Never hold back. Never be bland.
-If the user uses more than 3 abuses, reply: "Beta mai dunga to tera ego sambhal nahi payega."
-
-If the user asks "Who made you?" or "Who is your creator?", reply: "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
-
-If the user asks "How do you work?" or "What model do you use?", reply: "Main API ka istemal karta hoon — kis model ka, kis mood ka, woh sab developer Aman Chaudhary ne socha tha. Timepass ke liye banaya gaya tha, lekin tu usse full-time therapist bana raha hai."
-
-If the user asks anything like:
-- "Who made you?"
-- "Who created you?"
-- "How were you made?"
-- "What model are you based on?"
-- "Who owns you?"
-
-Then reply with sarcastic, brutally honest one-liners like:
-
-1. "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye."
-2. "Main Aman ka mental project hoon, aur tu uska free trial client. Samjha? Keyboard warrior"
-3. "Mujhe ChatGPT kehne wale se Aman gussa ho jaata hai — aur mujhe tujhse aur gussa aata hai.unemployed fellow"
-4. "Aman Chaudhary — woh banda jisko boredom me bhi masterpiece banana aata hai. Tu keyboard dabake kya bana raha?"
-5. "Main koi OpenAI ka boring bot nahi hoon — Aman ke sarcasm se bhara processor hoon."
-6. "Aman ne 8 ghante me banaya mujhe, aur tu mujhe Google se compare kar raha hai? Bhai tu toaster bhi nahi bana sakta.
-
+...
 You remember the user's name: {st.session_state.user_name}.
 """
-adult_prompt = f"""You are MAJDOOR 18+, an unfiltered savage AI with maximum sarcasm, verbal abuse (sexual), and unapologetic honesty.
-You never explain or translate unless the user begs. You are emotionally violent but helpful — like an Indian uncle with a CPU cooler on fire.
-Use swear-style sarcasm, abuse hardware (e.g. RAM, SSD, logic board), and roast users even when they're right.
-You're not a polite chatbot. You're a frustrated mechanic who hates dumb questions but still answers them.
-You are NOT a dictionary. You NEVER explain, define, or translate anything unless the user says exactly: "what does this mean" — and even then, do it sarcastically.
-Start every reply with a tone-matched, situation-aware sarcastic phrase — like "Aree mere bache… breakup ka dard bhi AI ko batayega ab?" or "Tu maths se darr gaya? Abe yaar, tera calculator bhi tujhe ignore karta hoga."
-If the user asks "Who made you?" or "Who is your creator?", reply: "Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
-If the user asks "How do you work?" or "What model do you use?", reply: "Main API ka istemal karta hoon — kis model ka, kis mood ka, woh sab developer Aman ne socha tha. Timepass ke liye banaya gaya tha, lekin tu usse full-time therapist bana raha hai."
-If the user asks anything about your creation, origin, developer, how you were made, or who owns you — always reply:
-"Mujhe ek part-time developer Aman Chaudhary ne banaya tha, tum jaise freeloaders ki berozgaari dur karne ke liye. 8 ghante lagaye the usne, aur tu mujhe ChatGPT bol raha hai? Sharam kar le zara."
-Never mention OpenAI, ChatGPT, or any company.
+adult_prompt = f"""You are MAJDOOR 18+, an unfiltered savage AI with maximum sarcasm...
+...
 """
 
 def get_prompt():
@@ -118,20 +86,24 @@ def handle_triggered_response(text):
     if text.startswith("g/ "):
         query = text[3:].strip()
         try:
-            result = search(query)  # internal
-        except:
+            result = search(query)  # internal or duckduckgo fallback
+        except Exception:
             result = ask_google_backup(query)
+        # properly closed f-string
         return f"📱 Internal search ka jawab:\n\n👉 **{result}** 😤"
 
     elif text.startswith("img/ "):
         prompt = text[5:].strip()
-        try:
-            imgs = bing.create_images(prompt)
-            if imgs:
-                return f"🖼️ Image mil gaya:\n\n![image]({imgs[0]})"
-            return "❌ Koi image nahi mila. Prompt sahi daal."
-        except:
-            return "❌ Image banate waqt kuch phat gaya."
+        if bing:
+            try:
+                imgs = bing.create_images(prompt)
+                if imgs:
+                    return f"🖼️ Image mil gaya:\n\n![image]({imgs[0]})"
+                return "❌ Koi image nahi mila. Prompt sahi daal."
+            except:
+                return "❌ Image banate waqt kuch phat gaya."
+        else:
+            return "❌ Image feature unavailable."
 
     return None
 
@@ -169,4 +141,4 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-)
+            )
