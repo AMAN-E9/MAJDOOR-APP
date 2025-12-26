@@ -131,11 +131,7 @@ if st.session_state.chat_history:
 
 user_input = st.chat_input("Type your message...")
 
-# Prefix news/: use Currents News API
-if text.startswith("news/ "):
-    query = text[6:].strip()
-    result = ask_news_backup(query)
-    return f"🗞️ News se mila jawab:\n\n👉 {result} 😤"
+
 
   
 
