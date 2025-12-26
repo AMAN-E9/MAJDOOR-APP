@@ -33,21 +33,39 @@ if "user_name" not in st.session_state:
 if "mode" not in st.session_state:
     st.session_state.mode = "normal"
 
-# 🏫 SerpAPI (as backup for prefix g/)
-SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c2309b73ca0d"
-def ask_google_backup(query):
+# 📰 Currents News API (FULLY FREE – prefix news/)
+CURRENTS_API_KEY = "Uc9m74S6PP2hYZAcadIoYoU_CDLNL0xCKLBlVClkVyKGIgA4"
+
+def ask_news_backup(query):
     try:
-        params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
-        search_api = GoogleSearch(params)
-        results = search_api.get_dict()
-        if "answer_box" in results:
-            ab = results["answer_box"]
-            return ab.get("answer") or ab.get("snippet") or ", ".join(ab.get("highlighted_words", []))
-        elif "organic_results" in results and results["organic_results"]:
-            return results["organic_results"][0].get("snippet", "❌ Google bhi chup ho gaya.")
-        return "❌ Google confuse ho gaya. Sawal dubara puch bhai."
+        params = {
+            "apiKey": CURRENTS_API_KEY,
+            "language": "en",
+            "keywords": query
+        }
+
+        r = requests.get(
+            "https://api.currentsapi.services/v1/latest-news",
+            params=params,
+            timeout=10
+        )
+
+        data = r.json()
+        news = data.get("news", [])
+
+        if not news:
+            return "❌ Majdoor dhundhta reh gaya, koi khabar nahi mili."
+
+        top = news[0]
+        return (
+            f"📰 Currents News se mila jawab:\n\n"
+            f"👉 {top.get('title','')}\n"
+            f"{top.get('description','')}\n"
+            f"🔗 {top.get('url','')}"
+        )
+
     except Exception as e:
-        return f"❌ Google API se bhatak gaya: {e}"
+        return f"❌ News API ka dimaag ghoom gaya: {e}"
 
 # 🎭 Sarcasm tagging
 def add_sarcasm_emoji(text):
@@ -113,13 +131,11 @@ if st.session_state.chat_history:
 
 user_input = st.chat_input("Type your message...")
 
-# 💡 Web/Image triggers
-def handle_triggered_response(text):
-    # Prefix g/: use SerpAPI
-    if text.startswith("g/ "):
-        query = text[3:].strip()
-        result = ask_google_backup(query)
-        return f"📡 Google (SerpAPI) se mila jawab:\n\n👉 **{result}** 😤"
+# Prefix news/: use Currents News API
+if text.startswith("news/ "):
+    query = text[6:].strip()
+    result = ask_news_backup(query)
+    return f"🗞️ News se mila jawab:\n\n👉 {result} 😤"
 
     # Prefix dd/: use DuckDuckGo text search
     elif text.startswith("dd/ "):
