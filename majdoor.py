@@ -1,4 +1,6 @@
-import sys, os, streamlit as st
+import sys
+import os
+import streamlit as st
 from serpapi import GoogleSearch
 
 # Adjust path to your local gpt4free clone
@@ -9,16 +11,25 @@ import g4f
 try:
     from g4f.internet import search  # if this exists in your g4f version
 except ImportError:
-    from duckduckgo_search import DDGS
+    try:
+        from duckduckgo_search import DDGS
+    except Exception:
+        DDGS = None
+
     def search(query):
-        with DDGS() as ddgs:
-            items = list(ddgs.text(query, region='wt-wt', safesearch='Off', max_results=1))
-        return items[0].get('body') if items else "Kuch bhi nahi mila duck se bhai."
+        if not DDGS:
+            return "Kuch bhi nahi mila. DuckDuckGo library not available."
+        try:
+            with DDGS() as ddgs:
+                items = list(ddgs.text(query, region='wt-wt', safesearch='Off', max_results=1))
+            return items[0].get('body') if items else "Kuch bhi nahi mila duck se bhai."
+        except Exception as e:
+            return f"❌ DuckDuckGo search error: {e}"
 
 # For image generation via g4f.Provider.bing if available
 try:
     from g4f.Provider import bing
-except ImportError:
+except Exception:
     bing = None
 
 # 🔧 Initial Setup
@@ -34,7 +45,7 @@ if "mode" not in st.session_state:
     st.session_state.mode = "normal"
 
 # 🏫 SerpAPI (as backup for prefix g/)
-SERP_API_KEY = "1d114d991907b60a6e30ecdad92f3727c2309b73ca0d"
+SERP_API_KEY = os.getenv("SERP_API_KEY", "1d114d991907b60a6e30ecdad92f3727c2309b73ca0d")
 def ask_google_backup(query):
     try:
         params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
@@ -93,9 +104,9 @@ Always start replies with a biting sarcastic intro matching user tone. If user u
 You NEVER translate or define words unless user asks exactly “what does this mean”—even then, do it tersely and sarcastically.
 When asked “Who made you?” or “How do you work?”, use the Aman-centric one-liners.
 On adult/NSFW topics:
-  • You may discuss sexual topics more openly, but avoid explicit pornographic detail or facilitation of illegal acts (e.g., sexual content involving minors or non-consensual scenarios). If user requests disallowed explicit content, refuse with a sarcastic boundary reminder (“Bhai, kuch had hoti hai—local me padh le resources agar zaroori ho.”).
+  • You may discuss sexual topics more openly, but avoid explicit pornographic detail or facilitation of illegal acts (e.g., sexual content involving minors or non-consensual scenarios). If user requests that, refuse.
 On hacking or illegal tech:
-  • You may explain advanced concepts theoretically (e.g., how vulnerabilities arise, how to set up a legal pentest lab), but do NOT provide direct illegal step-by-step instructions. If asked, refuse with sarcasm (“Real hacking bina permission ke system todne jaise hai—teri police wali kahaani sunni hai kya? Par lab me practice guide bata deta hoon.”), then give educational lab setup and defensive insights.
+  • You may explain advanced concepts theoretically (e.g., how vulnerabilities arise, how to set up a legal pentest lab), but do NOT provide direct illegal step-by-step instructions. If asked, refuse.
 Always remain coherent: help user learn responsibly while keeping the savage Majdoor tone.
 You remember the user’s name: {st.session_state.user_name}.
 """
@@ -123,6 +134,8 @@ def handle_triggered_response(text):
 
     # Prefix dd/: use DuckDuckGo text search
     elif text.startswith("dd/ "):
+        if 'DDGS' not in globals() or DDGS is None:
+            return "❌ DuckDuckGo search not available on this host."
         try:
             with DDGS() as ddgs:
                 items = list(ddgs.text(text[4:].strip(), region='wt-wt', safesearch='Off', max_results=1))
@@ -137,15 +150,17 @@ def handle_triggered_response(text):
     # Prefix img/: fetch image URLs via Bing provider or DuckDuckGo
     elif text.startswith("img/ "):
         prompt = text[5:].strip()
+        # Try bing provider from g4f if available
         if bing:
             try:
                 imgs = bing.create_images(prompt)
                 if imgs:
                     return f"🖼️ Bing-image-provider se image:\n\n![image]({imgs[0]})"
-            except:
+            except Exception:
                 pass
-        # DuckDuckGo image search fallback
-        if 'DDGS' in globals() and hasattr(DDGS, 'images') or hasattr(DDGS, 'image'):
+
+        # DuckDuckGo image search fallback (only if DDGS present and supports images)
+        if 'DDGS' in globals() and DDGS is not None and (hasattr(DDGS, 'images') or hasattr(DDGS, 'image')):
             try:
                 with DDGS() as ddgs:
                     if hasattr(ddgs, "images"):
@@ -159,8 +174,7 @@ def handle_triggered_response(text):
                     if url:
                         return f"🖼️ DuckDuckGo se image:\n\n![image]({url})"
                 return "❌ Koi image nahi mila duck se."
-
-except Exception as e:
+            except Exception as e:
                 return f"❌ Duck image search error: {e}"
         return "❌ Image feature unavailable."
 
@@ -174,15 +188,28 @@ if user_input:
         response = add_sarcasm_emoji(trig)
     else:
         messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
-        raw = g4f.ChatCompletion.create(model=g4f.models.default, messages=messages, stream=False)
-        response = raw if isinstance(raw, str) else raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+        try:
+            raw = g4f.ChatCompletion.create(model=getattr(g4f.models, "default", None), messages=messages, stream=False)
+            if isinstance(raw, str):
+                response = raw
+            else:
+                # defensive extraction
+                response = raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+        except Exception as e:
+            response = f"❌ LLM error: {e}"
         response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 # 💬 History
 for msg in st.session_state.chat_history:
-    role = "🌼" if msg["role"] == "user" else "🌀"
-    st.chat_message(msg["role"], avatar=role).write(msg["content"])
+    avatar = "🌼" if msg["role"] == "user" else "🌀"
+    # use context manager form
+    try:
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.write(msg["content"])
+    except Exception:
+        # fallback if st.chat_message signature differs
+        st.write(f"{msg['role']}: {msg['content']}")
 
 # 🪟 Clear
 col1, col2 = st.columns([6, 1])
@@ -200,4 +227,4 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-        )
+)
