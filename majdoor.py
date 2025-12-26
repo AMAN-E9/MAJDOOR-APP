@@ -1,6 +1,7 @@
 import sys
 import os
 import streamlit as st
+import requests
 from serpapi import GoogleSearch
 
 # Adjust path to your local gpt4free clone
@@ -59,6 +60,40 @@ def ask_google_backup(query):
         return "❌ Google confuse ho gaya. Sawal dubara puch bhai."
     except Exception as e:
         return f"❌ Google API se bhatak gaya: {e}"
+
+# 📰 Currents News API (prefix news/)
+CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY", "Uc9m74S6PP2hYZAcadIoYoU_CDLNL0xCKLBlVClkVyKGIgA4")
+
+def ask_news_backup(query):
+    try:
+        params = {
+            "apiKey": CURRENTS_API_KEY,
+            "language": "en",
+            "keywords": query
+        }
+
+        r = requests.get(
+            "https://api.currentsapi.services/v1/latest-news",
+            params=params,
+            timeout=10
+        )
+
+        data = r.json()
+        news = data.get("news", [])
+
+        if not news:
+            return "❌ Majdoor dhundhta reh gaya, koi khabar nahi mili."
+
+        top = news[0]
+        return (
+            f"📰 Currents News se mila jawab:\n\n"
+            f"👉 {top.get('title','')}\n"
+            f"{top.get('description','')}\n\n"
+            f"🔗 {top.get('url','')}"
+        )
+
+    except Exception as e:
+        return f"❌ News API ka dimaag ghoom gaya: {e}"
 
 # 🎭 Sarcasm tagging
 def add_sarcasm_emoji(text):
@@ -126,6 +161,13 @@ user_input = st.chat_input("Type your message...")
 
 # 💡 Web/Image triggers
 def handle_triggered_response(text):
+    # Prefix news/: use Currents News API
+    if text.startswith("news/ "):
+        query = text[6:].strip()
+        if not query:
+            return "❌ Kya dhoondhna hai? news/ ke baad kuch likh bhai."
+        return ask_news_backup(query)
+
     # Prefix g/: use SerpAPI
     if text.startswith("g/ "):
         query = text[3:].strip()
@@ -133,7 +175,7 @@ def handle_triggered_response(text):
         return f"📡 Google (SerpAPI) se mila jawab:\n\n👉 {result} 😤"
 
     # Prefix dd/: use DuckDuckGo text search
-    elif text.startswith("dd/ "):
+    if text.startswith("dd/ "):
         if 'DDGS' not in globals() or DDGS is None:
             return "❌ DuckDuckGo search not available on this host."
         try:
@@ -148,7 +190,7 @@ def handle_triggered_response(text):
             return f"❌ DuckDuckGo search mein error: {e}"
 
     # Prefix img/: fetch image URLs via Bing provider or DuckDuckGo
-    elif text.startswith("img/ "):
+    if text.startswith("img/ "):
         prompt = text[5:].strip()
         # Try bing provider from g4f if available
         if bing:
