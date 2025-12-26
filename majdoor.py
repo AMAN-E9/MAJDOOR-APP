@@ -137,18 +137,7 @@ if text.startswith("news/ "):
     result = ask_news_backup(query)
     return f"🗞️ News se mila jawab:\n\n👉 {result} 😤"
 
-    # Prefix dd/: use DuckDuckGo text search
-    elif text.startswith("dd/ "):
-        try:
-            with DDGS() as ddgs:
-                items = list(ddgs.text(text[4:].strip(), region='wt-wt', safesearch='Off', max_results=1))
-            if items:
-                body = items[0].get('body') or items[0].get('title') or "Kuch bhi nahi mila duck se."
-                return f"🌐 DuckDuckGo se mila jawab:\n\n👉 **{body}** 😤"
-            else:
-                return "❌ DuckDuckGo ne kuch nahi diya."
-        except Exception as e:
-            return f"❌ DuckDuckGo search mein error: {e}"
+  
 
     # Prefix img/: fetch image URLs via Bing provider or DuckDuckGo
     elif text.startswith("img/ "):
