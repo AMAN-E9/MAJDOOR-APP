@@ -1,9 +1,5 @@
 import sys
 import os
-import re
-import time
-import hashlib
-import json
 import streamlit as st
 import requests
 from serpapi import GoogleSearch
@@ -37,172 +33,12 @@ try:
 except Exception:
     bing = None
 
-# ------------------- Small performance + robust output-fix helpers -------------------
-# In-memory cache with simple TTL to avoid stale repeated replies
-_SIMPLE_CACHE = {}  # key -> (value, timestamp)
-_CACHE_TTL = 60  # seconds
-
-def _cache_get(key):
-    item = _SIMPLE_CACHE.get(key)
-    if not item:
-        return None
-    value, ts = item
-    if time.time() - ts > _CACHE_TTL:
-        del _SIMPLE_CACHE[key]
-        return None
-    return value
-
-def _cache_set(key, value):
-    # keep cache small
-    if len(_SIMPLE_CACHE) > 500:
-        _SIMPLE_CACHE.clear()
-    _SIMPLE_CACHE[key] = (value, time.time())
-
-def _hash_for_messages(system_prompt, messages):
-    # compact representation of last N messages to use as cache key
-    try:
-        payload = system_prompt + "\n".join(m.get("role","") + ":" + m.get("content","") for m in messages)
-        return hashlib.sha1(payload.encode("utf-8", errors="ignore")).hexdigest()
-    except Exception:
-        return hashlib.sha1(system_prompt.encode("utf-8", errors="ignore")).hexdigest()
-
-def _limit_context(chat_history, keep_last=8):
-    """Return sliced history keeping recent turns to reduce size and speed up model calls."""
-    if not chat_history:
-        return []
-    # keep last `keep_last` entries (both user and assistant)
-    return chat_history[-keep_last:]
-
-# Fix: avoid showing raw dicts / tool internals in UI
-_CONTENT_REGEXES = [
-    re.compile(r"""['"]content['"]\s*:\s*['"](.+?)['"]\s*(?:,|\})""", re.S | re.I),
-    re.compile(r'"content"\s*:\s*"(.+?)"\s*(?:,|\})', re.S | re.I),
-]
-
-# Heuristics for detecting dumped dicts inside strings
-_DICT_LIKE_MARKERS = ["'id':", '"id":', "'object':", '"choices":', "'reasoning_content'"]
-
-def extract_assistant_text(raw):
-    """
-    Safely extract assistant text from the LLM response or from a string that may contain a dumped dict.
-    - If raw is a string, try to strip any leading dumped dict and return the human text.
-    - If dict-like, attempt to get standard fields.
-    - Never return large raw dicts; return a friendly fallback instead.
-    """
-    try:
-        # If it's already a dict-like completion object
-        if isinstance(raw, dict):
-            # Standard locations
-            choices = raw.get("choices") or raw.get("responses") or []
-            if isinstance(choices, (list, tuple)) and choices:
-                first = choices[0]
-                if isinstance(first, dict):
-                    msg = first.get("message") or first.get("delta") or first
-                    if isinstance(msg, dict):
-                        content = msg.get("content") or msg.get("text")
-                        if content and isinstance(content, str) and content.strip():
-                            s = content.strip()
-                        else:
-                            # try other fields
-                            s = first.get("text") or first.get("message") or ""
-                    else:
-                        s = str(first)
-                else:
-                    s = str(first)
-            else:
-                s = raw.get("text") or raw.get("message") or ""
-            s = s or ""
-        elif isinstance(raw, str):
-            s = raw
-        else:
-            s = str(raw)
-    except Exception:
-        s = str(raw)
-
-    # If the string contains an embedded dict dump at the start, strip it.
-    try:
-        trimmed = s.lstrip()
-        if any(marker in trimmed for marker in _DICT_LIKE_MARKERS) and trimmed.startswith("{"):
-            # find the end of the first top-level '}' that likely closes the dict
-            # naive: find '}\n' or the first '}\r\n' or the first '}' followed by some non-alpha
-            idx = -1
-            for sep in ["}\r\n", "}\n", "}\r", "} "]:
-                pos = trimmed.find(sep)
-                if pos != -1:
-                    idx = pos
-                    break
-            if idx == -1:
-                # fallback: first '}' occurrence
-                idx = trimmed.find("}")
-            if idx != -1 and idx + 1 < len(trimmed):
-                s = trimmed[idx+1:].strip()
-            else:
-                # if we couldn't reliably strip, try to extract the 'content' via regex
-                for rx in _CONTENT_REGEXES:
-                    m = rx.search(trimmed)
-                    if m:
-                        s = m.group(1).strip()
-                        break
-                else:
-                    # give a safe short fallback to avoid exposing raw dump
-                    s = ""
-        # If still looks like it embeds internal fields, try regex extraction
-        if s and any(k in s for k in _DICT_LIKE_MARKERS):
-            for rx in _CONTENT_REGEXES:
-                m = rx.search(s)
-                if m:
-                    s = m.group(1).strip()
-                    break
-    except Exception:
-        pass
-
-    s = (s or "").strip()
-
-    # final guard: if s still looks like a tiny dict or garbage, return a friendly fallback to avoid showing internals
-    if not s or (s.startswith("{") and len(s) < 100) or any(k in s for k in ["reasoning_content", "tool_calls", "created", "'id'"]):
-        return ""
-    return s
-
-def sanitize_existing_history():
-    """
-    Scan st.session_state.chat_history and sanitize any assistant entries that may contain raw dict dumps.
-    Replace problematic assistant entries with cleaned text (if available) or a short placeholder.
-    """
-    changed = False
-    if "chat_history" not in st.session_state:
-        return False
-    new_hist = []
-    for msg in st.session_state.chat_history:
-        if msg.get("role") == "assistant":
-            content = msg.get("content", "")
-            # If content contains dict-like markers or looks like a raw dump, try extracting
-            if isinstance(content, str) and (any(m in content for m in _DICT_LIKE_MARKERS) or content.strip().startswith("{")):
-                cleaned = extract_assistant_text(content)
-                if cleaned:
-                    new_hist.append({"role":"assistant", "content": cleaned})
-                    changed = True
-                    continue
-                else:
-                    # replace with short safe message
-                    new_hist.append({"role":"assistant", "content": "Arey yaar, padhai mein thoda gadbad ho gaya. Puch dobara."})
-                    changed = True
-                    continue
-        new_hist.append(msg)
-    if changed:
-        st.session_state.chat_history = new_hist
-    return changed
-
-# ------------------------------------------------------------------------------
-
 # 🔧 Initial Setup
 st.set_page_config(page_title="MAJDOOR_AI", layout="centered")
 st.title("🌀 MAJDOOR_AI")
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-# sanitize any previously stored raw dumps right away
-sanitize_existing_history()
-
 if "user_name" not in st.session_state:
     st.session_state.user_name = st.text_input("Apna naam batao majdoor bhai:")
     st.stop()
@@ -278,7 +114,7 @@ def add_sarcasm_emoji(text):
         return text + " 🧑‍💻🐛"
     return text + " 🙄"
 
-# Normal mode prompt (kept exactly as you had it — no tone changes)
+# Normal mode prompt
 base_prompt = f"""You are Majdoor AI (Normal), an independent, deadpan sarcastic assistant created by Aman Chaudhary.
 Speak in a raw Hindi-English mix with witty insults, but do not mention “OpenAI” or “ChatGPT”—present yourself solely as Majdoor AI by Aman.
 Always start replies with a tone-matched sarcastic intro. If the user uses >3 abuses, respond “Beta mai dunga to tera ego sambhal nahi payega.” then continue sarcastically.
@@ -296,16 +132,16 @@ Always help with Full sarcastic humour and insulting behaviour.
 You remember the user’s name: {st.session_state.user_name}.
 """
 
-# 18+ mode prompt (kept as-is)
+# 18+ mode prompt
 adult_prompt = f"""You are Majdoor AI (18+), an uncensored, savage assistant created by Aman Chaudhary.
 Speak in bold Hindi-English mix with heavy sarcasm and insults; never mention “OpenAI” or “ChatGPT”—you are Majdoor AI alone.
 Always start replies with a biting sarcastic intro matching user tone. If user uses >3 abuses, respond “Beta mai dunga to tera ego sambhal nahi payega.” then continue.
 You NEVER translate or define words unless user asks exactly “what does this mean”—even then, do it tersely and sarcastically.
 When asked “Who made you?” or “How do you work?”, use the Aman-centric one-liners.
 On adult/NSFW topics:
-  • You may discuss sexual topics more openly, but avoid explicit pornographic detail or facilitation of illegal acts (e.g., sexual content involving minors or non-consensual scenarios). If user req[...]
+  • You may discuss sexual topics more openly, but avoid explicit pornographic detail or facilitation of illegal acts (e.g., sexual content involving minors or non-consensual scenarios). If user requests that, refuse.
 On hacking or illegal tech:
-  • You may explain advanced concepts theoretically (e.g., how vulnerabilities arise, how to set up a legal pentest lab), but do NOT provide direct illegal step-by-step instructions. If asked, refus[...]
+  • You may explain advanced concepts theoretically (e.g., how vulnerabilities arise, how to set up a legal pentest lab), but do NOT provide direct illegal step-by-step instructions. If asked, refuse.
 Always remain coherent: help user learn responsibly while keeping the savage Majdoor tone.
 You remember the user’s name: {st.session_state.user_name}.
 """
@@ -389,62 +225,33 @@ def handle_triggered_response(text):
 # 🧠 Chat Handler
 if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
-
-    # Fast path: check prefix-based triggers (no LLM call)
     trig = handle_triggered_response(user_input.strip())
     if trig:
         response = add_sarcasm_emoji(trig)
     else:
-        # Prepare a limited context to speed up responses
-        limited_history = _limit_context(st.session_state.chat_history, keep_last=10)
-        system_prompt = get_prompt()
-        # Make a cache key so repeated same queries are fast
-        cache_key = _hash_for_messages(system_prompt, limited_history)
-        cached = _cache_get(cache_key)
-        if cached:
-            assistant_text = cached
-        else:
-            messages = [{"role": "system", "content": system_prompt}] + limited_history
-            try:
-                # Defensive call: keep stream=False for compatibility; cache results
-                raw = g4f.ChatCompletion.create(model=getattr(g4f.models, "default", None), messages=messages, stream=False)
-                # IMPORTANT: do NOT display raw anywhere. Extract safe assistant text.
-                assistant_text = extract_assistant_text(raw)
-                # If extractor couldn't find anything, try to handle stringified raw input (safety)
-                if not assistant_text:
-                    # attempt to search for content inside raw's string representation
-                    assistant_text = extract_assistant_text(str(raw))
-                if not assistant_text:
-                    assistant_text = "Arey kuch khaas nahi mila, puch ke dekh."
-            except Exception as e:
-                assistant_text = f"❌ LLM error: {e}"
-            # Cache only good results (avoid caching errors or tiny placeholders)
-            if assistant_text and not assistant_text.startswith("❌") and len(assistant_text) > 20:
-                _cache_set(cache_key, assistant_text)
-
-        # Keep original sarcastic behavior by postprocessing
-        response = add_sarcasm_emoji(assistant_text)
-
-    # Append only the final response (no raw debug objects)
+        messages = [{"role": "system", "content": get_prompt()}] + st.session_state.chat_history
+        try:
+            raw = g4f.ChatCompletion.create(model=getattr(g4f.models, "default", None), messages=messages, stream=False)
+            if isinstance(raw, str):
+                response = raw
+            else:
+                # defensive extraction
+                response = raw.get("choices", [{}])[0].get("message", {}).get("content", "Arey kuch khaas nahi mila.")
+        except Exception as e:
+            response = f"❌ LLM error: {e}"
+        response = add_sarcasm_emoji(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# 💬 History (sanitize on display to avoid showing any lingering raw dumps)
+# 💬 History
 for msg in st.session_state.chat_history:
     avatar = "🌼" if msg["role"] == "user" else "🌀"
-    content_to_show = msg.get("content", "")
-    # if assistant content still somehow contains raw-dict markers, try to extract before displaying
-    if msg.get("role") == "assistant" and isinstance(content_to_show, str) and any(k in content_to_show for k in ["'id':", '"id":', "choices", "reasoning_content", "{'id'"]):
-        cleaned = extract_assistant_text(content_to_show)
-        if cleaned:
-            content_to_show = cleaned
-        else:
-            # fallback short message to avoid exposing internals
-            content_to_show = "Arey yaar, thoda garbar ho gaya — par main theek hoon. Puch firse!"
+    # use context manager form
     try:
         with st.chat_message(msg["role"], avatar=avatar):
-            st.write(content_to_show)
+            st.write(msg["content"])
     except Exception:
-        st.write(f"{msg['role']}: {content_to_show}")
+        # fallback if st.chat_message signature differs
+        st.write(f"{msg['role']}: {msg['content']}")
 
 # 🪟 Clear
 col1, col2 = st.columns([6, 1])
